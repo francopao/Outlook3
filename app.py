@@ -275,6 +275,10 @@ with tab4:
 
     tabla_sectorial = tabla[tabla["Index"].isin(indices_sectoriales)].copy()
     tabla_residual = tabla[~tabla['Index'].isin(indices_sectoriales)].copy()
+    # Ordenar segun YTD return
+    tabla_global = tabla_global.sort_values("YTD", ascending=False)
+    tabla_sectorial = tabla_sectorial.sort_values("YTD", ascending=False)
+    tabla_residual = tabla_residual.sort_values("YTD", ascending=False)
 
     # ----------------------------
     # 4) Render de tablas
