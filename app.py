@@ -298,9 +298,11 @@ for category, df in benchmark1.items():
     rows.append([category, label_ytd, r_ytd])
     rows.append([category, label_last_month, r_last_month])
 
-# ---- DataFrame final ----
-    df_out = pd.DataFrame(rows, columns=["Category", "Period", "Value"])
-    return df_out
+
+# ---- DataFrame final (FUERA del for) ----
+df_out = pd.DataFrame(rows, columns=["Category", "Period", "Value"])
+return df_out
+
 
 
 # --------------------------------------
