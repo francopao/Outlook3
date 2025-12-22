@@ -120,7 +120,7 @@ def graficar_fred(datos, titulo, series, zoom=False):
 
 @st.cache_data
 def load_equity_table():
-    file_path = "data/Indices actualizados.xlsx"
+    file_path = "data/indices_globales.xlsx"
     return pd.read_excel(file_path)
 
 def render_percent(val):
