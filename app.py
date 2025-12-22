@@ -256,58 +256,58 @@ def compute_period_returns(benchmark1):
 
 
      # --- Inputs de imagen de barras
-@st.cache_data(show_spinner=False)
-def load_asset_class1():
-    benchmark1 = load_benchmarks()
-    return compute_period_returns(benchmark1)
-
-asset_class1 = load_asset_class1()
+    @st.cache_data(show_spinner=False)
+    def load_asset_class1():
+        benchmark1 = load_benchmarks()
+        return compute_period_returns(benchmark1)
+    
+    asset_class1 = load_asset_class1()
 
 
     
     
         
   
-
-
-# ---- Cálculo de rentabilidades ----
-for category, df in benchmark1.items():
-
-    # La serie se supone que tiene solo 1 columna
-    series = df.iloc[:, 0].dropna()
-
-    # --- Rentabilidad año anterior ---
-    try:
-        price_start = series.loc[:start_last_year].iloc[-1]
-        price_end = series.loc[:end_last_year].iloc[-1]
-        r_last_year = (price_end / price_start - 1) * 100
-    except:
-        r_last_year = None
-
-    # --- Rentabilidad YTD ---
-    try:
-        price_start = series.loc[:start_ytd].iloc[-1]
-        price_end = series.iloc[-1]
-        r_ytd = (price_end / price_start - 1) * 100
-    except:
-        r_ytd = None
-
-    # --- Rentabilidad mes pasado completo a hoy ---
-    try:
-        price_start = series.loc[:last_month_start].iloc[-1]
-        price_end = series.iloc[-1]
-        r_last_month = (price_end / price_start - 1) * 100
-    except:
-        r_last_month = None
-
-    # --- Agregar resultados ---
-    rows.append([category, label_last_year, r_last_year])
-    rows.append([category, label_ytd, r_ytd])
-    rows.append([category, label_last_month, r_last_month])
-
-# ---- DataFrame final ----
-df_out = pd.DataFrame(rows, columns=["Category", "Period", "Value"])
-return df_out
+    
+    
+    # ---- Cálculo de rentabilidades ----
+    for category, df in benchmark1.items():
+    
+        # La serie se supone que tiene solo 1 columna
+        series = df.iloc[:, 0].dropna()
+    
+        # --- Rentabilidad año anterior ---
+        try:
+            price_start = series.loc[:start_last_year].iloc[-1]
+            price_end = series.loc[:end_last_year].iloc[-1]
+            r_last_year = (price_end / price_start - 1) * 100
+        except:
+            r_last_year = None
+    
+        # --- Rentabilidad YTD ---
+        try:
+            price_start = series.loc[:start_ytd].iloc[-1]
+            price_end = series.iloc[-1]
+            r_ytd = (price_end / price_start - 1) * 100
+        except:
+            r_ytd = None
+    
+        # --- Rentabilidad mes pasado completo a hoy ---
+        try:
+            price_start = series.loc[:last_month_start].iloc[-1]
+            price_end = series.iloc[-1]
+            r_last_month = (price_end / price_start - 1) * 100
+        except:
+            r_last_month = None
+    
+        # --- Agregar resultados ---
+        rows.append([category, label_last_year, r_last_year])
+        rows.append([category, label_ytd, r_ytd])
+        rows.append([category, label_last_month, r_last_month])
+    
+    # ---- DataFrame final ----
+    df_out = pd.DataFrame(rows, columns=["Category", "Period", "Value"])
+    return df_out
 
 
 # --------------------------------------
