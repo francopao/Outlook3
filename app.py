@@ -10,6 +10,8 @@ import fear_and_greed
 from datetime import datetime
 import matplotlib.pyplot as plt
 import numpy as np
+import textwrap
+from dateutil.relativedelta import relativedelta
 # --------------------------------------
 # SCRAPER Y TRANSFORMADOR DE DATOS
 # --------------------------------------
