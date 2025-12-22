@@ -480,7 +480,7 @@ with tab4:
             max_ret = row["Return"]
     
     df_frontier = pd.DataFrame(frontier)
-    st.write(asset_class1.head())
+    
 
     # -------------------------------
     # Gráfico
