@@ -8,3 +8,4 @@ fredapi
 matplotlib
 openpyxl
 xlsxwriter
+fear_and_greed
