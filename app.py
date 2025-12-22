@@ -368,7 +368,7 @@ with tab1:
     else:
         st.warning("No se encontraron datos para los años seleccionados.")
 
-st.write(asset_class1.head())
+
 
 with tab4:
     st.subheader("📊 Equity & Index Performance")
