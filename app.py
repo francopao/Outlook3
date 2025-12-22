@@ -1,0 +1,237 @@
+import streamlit as st
+import pandas as pd
+import requests
+from bs4 import BeautifulSoup
+import plotly.express as px
+import plotly.graph_objects as go
+import io
+from fredapi import Fred
+import fear_and_greed
+from datetime import datetime
+import matplotlib.pyplot as plt
+# --------------------------------------
+# SCRAPER Y TRANSFORMADOR DE DATOS
+# --------------------------------------
+
+@st.cache_data
+def obtener_datos_tesoro(periodos):
+    all_data = []
+    headers = []
+    for year in periodos:
+        url = f'https://home.treasury.gov/resource-center/data-chart-center/interest-rates/TextView?type=daily_treasury_yield_curve&field_tdr_date_value={year}'
+        response = requests.get(url)
+
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.content, 'html.parser')
+            table = soup.find('table', {'class': 'usa-table views-table views-view-table cols-26'})
+            if table:
+                headers = [header.text.strip() for header in table.find_all('th')]
+                for row in table.find_all('tr')[1:]:
+                    cells = [year] + [cell.text.strip() for cell in row.find_all('td')]
+                    all_data.append(cells)
+
+    if all_data:
+        headers = ['Year'] + headers
+        df = pd.DataFrame(all_data, columns=headers)
+        df = df.drop(columns=['1.5 Mo'], errors='ignore')
+        df = df.apply(lambda x: x.replace('N/A', pd.NA) if x.dtype == "object" else x)
+        df = df.dropna(axis=1, how='all')
+        df = df.fillna(0)
+        for col in df.columns[2:]:
+            df[col] = pd.to_numeric(df[col], errors='coerce')
+        df["Date"] = pd.to_datetime(df["Date"])
+        df = df.sort_values("Date")
+        return df
+    else:
+        return pd.DataFrame()
+
+# --------------------------------------
+# FUNCIONES FRED
+# --------------------------------------
+    
+def obtener_datos_fred():
+    codigos = {
+        # Labor Market
+        "Total Nonfarm Payrolls": "PAYEMS",
+        "Unemployment Rate": "UNRATE",
+        "Labor Force Participation Rate": "CIVPART",
+        "Job Openings (JOLTS)": "JTSJOL",
+        "Average Hourly Earnings (Total Private)": "CES0500000003",
+        "U-6 Unemployment Rate": "U6RATE",
+        "Quits Rate (JOLTS)": "JTSQUR",
+
+        # Credit/Market
+        "Rating AAA": "BAMLC0A1CAAA",
+        "Rating AA": "BAMLC0A2CAA",
+        "Rating A": "BAMLC0A3CA",
+        "Rating BBB": "BAMLC0A4CBBB",
+        "BBB o superior": "BAMLC0A0CM",
+        "High Yield": "BAMLH0A0HYM2EY",
+        "Investment Grade": "BAMLC0A4CBBBEY",
+        "Rating AAA ": "BAMLC0A1CAAASYTW",
+        "Rating AA ": "BAMLC0A2CAASYTW",
+        "Rating A ": "BAMLC0A3CASYTW",
+        "Rating BBB ": "BAMLC0A4CBBBSYTW",
+        "High Yield ": "BAMLH0A0HYM2SYTW",
+        "10-Year Treasury Market Yield ": "DGS10",
+        "5-Year Inflation Expectation ": "T5YIFR",
+        "2-Year Treasury Market Yield ": "DGS2",
+        "Rating AAA Corporate Yield ": "BAMLC0A1CAAAEY",
+        
+        # YTW bonds to economic zone
+        "Global": "BAMLEMUBCRPIUSSYTW",
+        "Euro": "BAMLEMEBCRPIESYTW",
+        "Latin America": "BAMLEMRLCRPILASYTW",
+        "Asia": "BAMLEMRACRPIASIASYTW",
+        "EMEA": "BAMLEMRECRPIEMEASYTW",
+        
+        # Michingan Consumer Sentiment Index - MCSI
+     #   "MSCI": "UMCSENT",
+     #   "Home Purchase Sentiment Index":"HPSI",
+        
+        # Monetary Policy
+        "Inflation Expectation (University of Michigan)": "MICH",
+        "CPI":"CPIAUCSL",
+        "30-year Breakeven Inflation": "T30YIEM",
+        "5-Year Breakeven Inflation":"T5YIE",
+        
+        # Consumption
+       # "Retail Sales": "RSXFS",
+       # "S&P National Home Price Index":"CSUSHPINSA",
+       # "Personal Consumption Expenditures": "PCE",
+       # "Total Vehicle Sales": "TOTALSA"
+
+    }
+    datos = {}
+    fred = Fred(api_key='762e2ee1c8fab5d038ce317929d47226')
+    for nombre, codigo in codigos.items():
+        serie = fred.get_series(codigo)
+        serie.name = nombre
+        datos[nombre] = serie
+    return datos
+
+def graficar_fred(datos, titulo, series, zoom=False):
+    fig = go.Figure()
+    for serie in series:
+        data = datos[serie].tail(30) if zoom else datos[serie]
+        fig.add_trace(go.Scatter(x=data.index, y=data.values, mode='lines', name=serie))
+    fig.update_layout(title=titulo, xaxis_title="Fecha", yaxis_title="Valor", template="plotly_white")
+    return fig
+
+@st.cache_data
+def load_equity_table():
+    file_path = "data/Indices actualizados.xlsx"
+    return pd.read_excel(file_path)
+
+def render_percent(val):
+    if pd.isna(val) or val == 0:
+        return ""
+
+    val_pct = val * 100
+    arrow = "▲" if val > 0 else "▼"
+    return f"{arrow} {val_pct:.2f}%"
+
+# --------------------------------------
+# STREAMLIT UI
+# --------------------------------------
+
+st.set_page_config(layout="wide")
+st.image("https://media.licdn.com/dms/image/v2/D4E03AQHNhGZoA9sCQA/profile-displayphoto-shrink_200_200/B4EZahq4dLGQAg-/0/1746469097627?e=2147483647&v=beta&t=hAA0K9UwE_sigpOhx5y4U4soabNV6x8H8O-VZBDvhbM", 
+         width=200)
+st.title("Global Fixed Income Dashboard - Franco Olivares")
+
+tab1, tab2, tab3, tab4 = st.tabs(["Treasury Yields", "US Corporate Bonds", "US Labor Market", "Equity"])
+
+# --------------------------------------
+# TAB 1: CURVAS DEL TESORO
+# --------------------------------------    
+with tab1:
+    años = st.multiselect("Selecciona año(s):", list(range(2006, 2026)), default=[2025])
+    df = obtener_datos_tesoro(años)
+
+    if not df.empty:
+        st.success(f"{df.shape[0]} registros obtenidos.")
+
+        fechas = sorted(df["Date"].unique())
+        fechas_seleccionadas = st.multiselect("Selecciona una o más fechas para comparar curvas:", fechas[-10:], default=fechas[-3:])
+
+        if "10 Yr" in df.columns and "2 Yr" in df.columns:
+            df["Spread 10Y - 2Y"] = df["10 Yr"] - df["2 Yr"]
+            st.metric("📉 Spread 10Y - 2Y actual", f"{df['Spread 10Y - 2Y'].iloc[-1]:.2f} %")
+            fig_spread = px.line(df, x="Date", y="Spread 10Y - 2Y", title="Evolución del Spread 10Y - 2Y")
+            st.plotly_chart(fig_spread, use_container_width=True)
+
+        st.subheader("Comparación de curvas por fecha")
+        fig_comparacion = px.line()
+
+        for fecha in fechas_seleccionadas:
+            datos_fecha = df[df["Date"] == fecha].iloc[0]
+            maturities = df.columns[2:-2]
+            tasas = datos_fecha[maturities].values.astype(float)
+            fig_comparacion.add_scatter(x=maturities, y=tasas, mode="lines+markers", name=str(fecha.date()))
+
+        fig_comparacion.update_layout(title="Curvas de rendimiento comparadas", xaxis_title="Plazo", yaxis_title="Rendimiento (%)")
+        st.plotly_chart(fig_comparacion, use_container_width=True)
+
+        st.subheader("Rendimiento de los bonos del Tesoro a la par")
+        df_anim = df.copy()
+        df_anim = df_anim.melt(id_vars=["Date"], value_vars=maturities, var_name="Maturity", value_name="Yield")
+
+        fig_anim = px.line(df_anim, x="Maturity", y="Yield", animation_frame=df_anim["Date"].dt.strftime("%Y-%m-%d"),
+                        title="Evolución diaria de la curva de rendimiento")
+        fig_anim.update_layout(xaxis_title="Plazo", yaxis_title="Rendimiento (%)")
+        st.plotly_chart(fig_anim, use_container_width=True)
+
+        st.subheader("Exportar datos")
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            df.to_excel(writer, index=False, sheet_name='Yield Curve')
+            if "Spread 10Y - 2Y" in df.columns:
+                df[['Date', 'Spread 10Y - 2Y']].to_excel(writer, index=False, sheet_name='Spread')
+
+        st.download_button(label="⬇️ Descargar Excel", data=output.getvalue(), file_name="treasury_yield_curve.xlsx")
+
+    else:
+        st.warning("No se encontraron datos para los años seleccionados.")
+
+with tab4:
+    st.subheader("📊 Equity & Index Performance")
+
+    tabla = load_equity_table()
+    df_display = tabla.copy()
+
+    # Columnas porcentuales
+    cols_pct = ["Latest 7d", "MTD", "YTD", df_display.columns[-1]]
+
+    for col in cols_pct:
+        if col in df_display.columns:
+            df_display[col] = df_display[col].apply(render_percent)
+
+    # Level formatting
+    if "Level" in df_display.columns:
+        df_display["Level"] = df_display["Level"].apply(
+            lambda x: f"{x:,.2f}" if isinstance(x, (float, int)) and x != 0 else ""
+        )
+
+    fig = go.Figure(
+        data=[
+            go.Table(
+                header=dict(
+                    values=[f"<b>{v}</b>" for v in df_display.columns],
+                    fill_color="#003366",
+                    font=dict(color="white", size=14),
+                    align="center",
+                    height=40
+                ),
+                cells=dict(
+                    values=[df_display[col] for col in df_display.columns],
+                    align="center",
+                    height=32,
+                    font=dict(size=13)
+                )
+            )
+        ]
+    )
+
+    fig.update_layout(height=520)
+    st.plotly_chart(fig, use_container_width=True)
