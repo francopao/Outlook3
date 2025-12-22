@@ -230,6 +230,10 @@ def compute_period_returns(benchmark1):
     label_last_month = last_month_start.strftime("%b%y")  # ej: "Nov25"
 
     rows = []
+    # --- Inputs de imagen de barras
+    benchmark1 = load_benchmarks()
+    asset_class1 = compute_period_returns(benchmark1)
+
 
     # ---- Cálculo de rentabilidades ----
     for category, df in benchmark1.items():
@@ -332,9 +336,6 @@ with tab1:
     else:
         st.warning("No se encontraron datos para los años seleccionados.")
 
-# --- Inputs de imagen de barras
-benchmark1 = load_benchmarks()
-asset_class1 = compute_period_returns(benchmark1)
 
 with tab4:
     st.subheader("📊 Equity & Index Performance")
