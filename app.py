@@ -181,7 +181,7 @@ def load_benchmarks():
         "GEM equities": "EEM",
         "Global government bonds": "IGLO.L",
         "Global EM government bonds": "LEMB",
-        "Gold": "GOLD",
+        "Gold": "GLD",
         "Other commodities": "^BCOM",
         "Real estate": "REET",
         "Crypto": "BTC-USD"
