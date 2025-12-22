@@ -172,6 +172,101 @@ def render_percent(val):
     arrow = "▲" if val > 0 else "▼"
     return f"{arrow} {val_pct:.2f}%"
 
+@st.cache_data(show_spinner=False)
+def load_benchmarks():
+
+    yahoo_assets = {
+        "Global equities": "SPY",
+        "GEM equities": "EEM",
+        "Global government bonds": "IGLO.L",
+        "Global EM government bonds": "LEMB",
+        "Gold": "GOLD",
+        "Other commodities": "^BCOM",
+        "Real estate": "REET",
+        "Crypto": "BTC-USD"
+    }
+
+    fred_series = {
+        "Global HY corp bonds": "BAMLH0A0HYM2EY",
+        "Global IG corp bonds": "BAMLC0A0CMEY"
+    }
+
+    benchmark1 = {}
+
+    for name, ticker in yahoo_assets.items():
+        df = yf.download(ticker, progress=False)[["Close"]]
+        benchmark1[name] = df.rename(columns={"Close": name})
+
+    for name, series_id in fred_series.items():
+        data = fred.get_series(series_id)
+        df = pd.DataFrame(data, columns=[name])
+        df.index = pd.to_datetime(df.index)
+        benchmark1[name] = df
+
+    return benchmark1
+
+def compute_period_returns(benchmark1):
+    today = pd.Timestamp.today().normalize()
+
+    # ---- Periodos dinámicos ----
+    last_year = today.year - 1
+
+    # Primer día del año anterior
+    start_last_year = pd.Timestamp(f"{last_year}-01-01")
+    end_last_year = pd.Timestamp(f"{last_year}-12-31")
+
+    # YTD
+    start_ytd = pd.Timestamp(f"{today.year}-01-01")
+
+    # Mes pasado completo
+    last_month_end = (today.replace(day=1) - pd.Timedelta(days=1))
+    last_month_start = last_month_end.replace(day=1)
+
+    # Etiquetas dinámicas
+    label_last_year = str(last_year)
+    label_ytd = "YTD"
+    label_last_month = last_month_start.strftime("%b%y")  # ej: "Nov25"
+
+    rows = []
+
+    # ---- Cálculo de rentabilidades ----
+    for category, df in benchmark1.items():
+
+        # La serie se supone que tiene solo 1 columna
+        series = df.iloc[:, 0].dropna()
+
+        # --- Rentabilidad año anterior ---
+        try:
+            price_start = series.loc[:start_last_year].iloc[-1]
+            price_end = series.loc[:end_last_year].iloc[-1]
+            r_last_year = (price_end / price_start - 1) * 100
+        except:
+            r_last_year = None
+
+        # --- Rentabilidad YTD ---
+        try:
+            price_start = series.loc[:start_ytd].iloc[-1]
+            price_end = series.iloc[-1]
+            r_ytd = (price_end / price_start - 1) * 100
+        except:
+            r_ytd = None
+
+        # --- Rentabilidad mes pasado completo a hoy ---
+        try:
+            price_start = series.loc[:last_month_start].iloc[-1]
+            price_end = series.iloc[-1]
+            r_last_month = (price_end / price_start - 1) * 100
+        except:
+            r_last_month = None
+
+        # --- Agregar resultados ---
+        rows.append([category, label_last_year, r_last_year])
+        rows.append([category, label_ytd, r_ytd])
+        rows.append([category, label_last_month, r_last_month])
+
+    # ---- DataFrame final ----
+    df_out = pd.DataFrame(rows, columns=["Category", "Period", "Value"])
+    return df_out
 # --------------------------------------
 # STREAMLIT UI
 # --------------------------------------
@@ -235,6 +330,10 @@ with tab1:
     else:
         st.warning("No se encontraron datos para los años seleccionados.")
 
+# --- Inputs de imagen de barras
+benchmark1 = load_benchmarks()
+asset_class1 = compute_period_returns(benchmark1)
+
 with tab4:
     st.subheader("📊 Equity & Index Performance")
 
@@ -284,19 +383,19 @@ with tab4:
     # ----------------------------
     # 4) Render de tablas
     # ----------------------------
-    st.markdown("### 🌍 Global Equity Indices")
+    st.markdown("### Global Equity Indices")
     st.plotly_chart(
         render_equity_table(tabla_global, height=360),
         use_container_width=True
     )
 
-    st.markdown("### 🏭 Sector Indices")
+    st.markdown("### Sector Indices")
     st.plotly_chart(
         render_equity_table(tabla_sectorial, height=520),
         use_container_width=True
     )
 
-    st.markdown("### 📌 Other Indices")
+    st.markdown("### Other Indices")
     st.plotly_chart(
         render_equity_table(tabla_residual, height=420),
         use_container_width=True
@@ -304,7 +403,7 @@ with tab4:
 
 
 
-    st.markdown("### 📈 Risk–Return & Efficient Frontier")
+    st.markdown("### Risk–Return & Efficient Frontier")
 
     # Selector de periodo
     current_year = datetime.now().year
@@ -381,6 +480,65 @@ with tab4:
     
     
     st.plotly_chart(fig, use_container_width=True)
-    
+
+    st.markdown("### Asset Class Performance")
+
+    fig, ax = plt.subplots(figsize=(18, 6))
+
+    unique_periods = asset_class1["Period"].unique()
+    period_year  = [p for p in unique_periods if p != "YTD" and p[:3].isdigit()]
+    period_ytd   = ["YTD"]
+    period_other = [p for p in unique_periods if p not in period_year and p != "YTD"]
+    periods = period_year + period_ytd + period_other
+
+    color_map = {
+        periods[0]: "black",
+        periods[1]: "gray",
+        periods[2]: "red"
+    }
+
+    categories = asset_class1["Category"].unique()
+    x = np.arange(len(categories))
+    width = 0.28
+    bars = {}
+
+    for i, period in enumerate(periods):
+        subset = asset_class1[asset_class1["Period"] == period]
+        values = subset["Value"].values
+        offset = (i - 1) * width
+        bars[period] = ax.bar(
+            x + offset,
+            values,
+            width,
+            color=color_map[period],
+            label=period
+        )
+
+    def add_labels(bar_container):
+        for bar in bar_container:
+            h = bar.get_height()
+            offset = max(0.03 * abs(h), 0.5)
+            y = h + offset if h >= 0 else h - offset
+            ax.text(bar.get_x() + bar.get_width()/2, y, f"{h:.1f}",
+                    ha="center", va="bottom" if h >= 0 else "top", fontsize=9)
+
+    for period in periods:
+        add_labels(bars[period])
+
+    ax.axhline(0, color="black", linewidth=1)
+
+    wrapped = ["\n".join(textwrap.wrap(c, 18)) for c in categories]
+    ax.set_xticks(x)
+    ax.set_xticklabels(wrapped, fontsize=10)
+    ax.set_ylabel("%")
+
+    ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.20),
+              ncol=3, frameon=False)
+
+    fig.tight_layout()
+    st.pyplot(fig)
+
+
+
 
 
