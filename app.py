@@ -259,11 +259,11 @@ def compute_period_returns(benchmark1):
     def load_asset_class1():
         benchmark1 = load_benchmarks()
         return compute_period_returns(benchmark1)
-
-    benchmark1 = load_benchmarks()
-    asset_class1 = load_asset_class1()
-
     
+    asset_class1 = load_asset_class1()
+    
+    
+        
   
 
 
