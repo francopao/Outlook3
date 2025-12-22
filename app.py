@@ -16,242 +16,242 @@ from dateutil.relativedelta import relativedelta
 # SCRAPER Y TRANSFORMADOR DE DATOS
 # --------------------------------------
 
-@st.cache_data
-def obtener_datos_tesoro(periodos):
-    all_data = []
-    headers = []
-    for year in periodos:
-        url = f'https://home.treasury.gov/resource-center/data-chart-center/interest-rates/TextView?type=daily_treasury_yield_curve&field_tdr_date_value={year}'
-        response = requests.get(url)
-
-        if response.status_code == 200:
-            soup = BeautifulSoup(response.content, 'html.parser')
-            table = soup.find('table', {'class': 'usa-table views-table views-view-table cols-26'})
-            if table:
-                headers = [header.text.strip() for header in table.find_all('th')]
-                for row in table.find_all('tr')[1:]:
-                    cells = [year] + [cell.text.strip() for cell in row.find_all('td')]
-                    all_data.append(cells)
-
-    if all_data:
-        headers = ['Year'] + headers
-        df = pd.DataFrame(all_data, columns=headers)
-        df = df.drop(columns=['1.5 Mo'], errors='ignore')
-        df = df.apply(lambda x: x.replace('N/A', pd.NA) if x.dtype == "object" else x)
-        df = df.dropna(axis=1, how='all')
-        df = df.fillna(0)
-        for col in df.columns[2:]:
-            df[col] = pd.to_numeric(df[col], errors='coerce')
-        df["Date"] = pd.to_datetime(df["Date"])
-        df = df.sort_values("Date")
-        return df
-    else:
-        return pd.DataFrame()
-
-# --------------------------------------
-# FUNCION PARA INDICES
-def render_equity_table(df, height=420):
-    df_display = df.copy()
-
-    # Columnas porcentuales
-    cols_pct = ["Latest 7d", "MTD", "YTD", df_display.columns[-1]]
-    for col in cols_pct:
-        if col in df_display.columns:
-            df_display[col] = df_display[col].apply(render_percent)
-
-    # Level formatting
-    if "Level" in df_display.columns:
-        df_display["Level"] = df_display["Level"].apply(
-            lambda x: f"{x:,.2f}" if isinstance(x, (float, int)) and x != 0 else ""
-        )
-
-    fig = go.Figure(
-        data=[
-            go.Table(
-                header=dict(
-                    values=[f"<b>{v}</b>" for v in df_display.columns],
-                    fill_color="#003366",
-                    font=dict(color="white", size=14),
-                    align="center",
-                    height=40
-                ),
-                cells=dict(
-                    values=[df_display[col] for col in df_display.columns],
-                    align="center",
-                    height=32,
-                    font=dict(size=13)
-                )
-            )
-        ]
-    )
-
-    fig.update_layout(height=height)
-    return fig
-
-# --------------------------------------
-# FUNCIONES FRED
-# --------------------------------------
+    @st.cache_data
+    def obtener_datos_tesoro(periodos):
+        all_data = []
+        headers = []
+        for year in periodos:
+            url = f'https://home.treasury.gov/resource-center/data-chart-center/interest-rates/TextView?type=daily_treasury_yield_curve&field_tdr_date_value={year}'
+            response = requests.get(url)
     
-def obtener_datos_fred():
-    codigos = {
-        # Labor Market
-        "Total Nonfarm Payrolls": "PAYEMS",
-        "Unemployment Rate": "UNRATE",
-        "Labor Force Participation Rate": "CIVPART",
-        "Job Openings (JOLTS)": "JTSJOL",
-        "Average Hourly Earnings (Total Private)": "CES0500000003",
-        "U-6 Unemployment Rate": "U6RATE",
-        "Quits Rate (JOLTS)": "JTSQUR",
-
-        # Credit/Market
-        "Rating AAA": "BAMLC0A1CAAA",
-        "Rating AA": "BAMLC0A2CAA",
-        "Rating A": "BAMLC0A3CA",
-        "Rating BBB": "BAMLC0A4CBBB",
-        "BBB o superior": "BAMLC0A0CM",
-        "High Yield": "BAMLH0A0HYM2EY",
-        "Investment Grade": "BAMLC0A4CBBBEY",
-        "Rating AAA ": "BAMLC0A1CAAASYTW",
-        "Rating AA ": "BAMLC0A2CAASYTW",
-        "Rating A ": "BAMLC0A3CASYTW",
-        "Rating BBB ": "BAMLC0A4CBBBSYTW",
-        "High Yield ": "BAMLH0A0HYM2SYTW",
-        "10-Year Treasury Market Yield ": "DGS10",
-        "5-Year Inflation Expectation ": "T5YIFR",
-        "2-Year Treasury Market Yield ": "DGS2",
-        "Rating AAA Corporate Yield ": "BAMLC0A1CAAAEY",
+            if response.status_code == 200:
+                soup = BeautifulSoup(response.content, 'html.parser')
+                table = soup.find('table', {'class': 'usa-table views-table views-view-table cols-26'})
+                if table:
+                    headers = [header.text.strip() for header in table.find_all('th')]
+                    for row in table.find_all('tr')[1:]:
+                        cells = [year] + [cell.text.strip() for cell in row.find_all('td')]
+                        all_data.append(cells)
+    
+        if all_data:
+            headers = ['Year'] + headers
+            df = pd.DataFrame(all_data, columns=headers)
+            df = df.drop(columns=['1.5 Mo'], errors='ignore')
+            df = df.apply(lambda x: x.replace('N/A', pd.NA) if x.dtype == "object" else x)
+            df = df.dropna(axis=1, how='all')
+            df = df.fillna(0)
+            for col in df.columns[2:]:
+                df[col] = pd.to_numeric(df[col], errors='coerce')
+            df["Date"] = pd.to_datetime(df["Date"])
+            df = df.sort_values("Date")
+            return df
+        else:
+            return pd.DataFrame()
+    
+    # --------------------------------------
+    # FUNCION PARA INDICES
+    def render_equity_table(df, height=420):
+        df_display = df.copy()
+    
+        # Columnas porcentuales
+        cols_pct = ["Latest 7d", "MTD", "YTD", df_display.columns[-1]]
+        for col in cols_pct:
+            if col in df_display.columns:
+                df_display[col] = df_display[col].apply(render_percent)
+    
+        # Level formatting
+        if "Level" in df_display.columns:
+            df_display["Level"] = df_display["Level"].apply(
+                lambda x: f"{x:,.2f}" if isinstance(x, (float, int)) and x != 0 else ""
+            )
+    
+        fig = go.Figure(
+            data=[
+                go.Table(
+                    header=dict(
+                        values=[f"<b>{v}</b>" for v in df_display.columns],
+                        fill_color="#003366",
+                        font=dict(color="white", size=14),
+                        align="center",
+                        height=40
+                    ),
+                    cells=dict(
+                        values=[df_display[col] for col in df_display.columns],
+                        align="center",
+                        height=32,
+                        font=dict(size=13)
+                    )
+                )
+            ]
+        )
+    
+        fig.update_layout(height=height)
+        return fig
+    
+    # --------------------------------------
+    # FUNCIONES FRED
+    # --------------------------------------
         
-        # YTW bonds to economic zone
-        "Global": "BAMLEMUBCRPIUSSYTW",
-        "Euro": "BAMLEMEBCRPIESYTW",
-        "Latin America": "BAMLEMRLCRPILASYTW",
-        "Asia": "BAMLEMRACRPIASIASYTW",
-        "EMEA": "BAMLEMRECRPIEMEASYTW",
-        
-        # Michingan Consumer Sentiment Index - MCSI
-     #   "MSCI": "UMCSENT",
-     #   "Home Purchase Sentiment Index":"HPSI",
-        
-        # Monetary Policy
-        "Inflation Expectation (University of Michigan)": "MICH",
-        "CPI":"CPIAUCSL",
-        "30-year Breakeven Inflation": "T30YIEM",
-        "5-Year Breakeven Inflation":"T5YIE",
-        
-        # Consumption
-       # "Retail Sales": "RSXFS",
-       # "S&P National Home Price Index":"CSUSHPINSA",
-       # "Personal Consumption Expenditures": "PCE",
-       # "Total Vehicle Sales": "TOTALSA"
-
-    }
-    datos = {}
-    fred = Fred(api_key='762e2ee1c8fab5d038ce317929d47226')
-    for nombre, codigo in codigos.items():
-        serie = fred.get_series(codigo)
-        serie.name = nombre
-        datos[nombre] = serie
-    return datos
-
-def graficar_fred(datos, titulo, series, zoom=False):
-    fig = go.Figure()
-    for serie in series:
-        data = datos[serie].tail(30) if zoom else datos[serie]
-        fig.add_trace(go.Scatter(x=data.index, y=data.values, mode='lines', name=serie))
-    fig.update_layout(title=titulo, xaxis_title="Fecha", yaxis_title="Valor", template="plotly_white")
-    return fig
-
-@st.cache_data
-def load_equity_table():
-    file_path = "data/indices_globales.xlsx"
-    return pd.read_excel(file_path)
-
-def render_percent(val):
-    if pd.isna(val) or val == 0:
-        return ""
-
-    val_pct = val * 100
-    arrow = "▲" if val > 0 else "▼"
-    return f"{arrow} {val_pct:.2f}%"
-
-@st.cache_data(show_spinner=False)
-def load_benchmarks():
-
-    yahoo_assets = {
-        "Global equities": "SPY",
-        "GEM equities": "EEM",
-        "Global government bonds": "IGLO.L",
-        "Global EM government bonds": "LEMB",
-        "Gold": "GOLD",
-        "Other commodities": "^BCOM",
-        "Real estate": "REET",
-        "Crypto": "BTC-USD"
-    }
-
-    fred_series = {
-        "Global HY corp bonds": "BAMLH0A0HYM2EY",
-        "Global IG corp bonds": "BAMLC0A0CMEY"
-    }
-
-    benchmark1 = {}
-
-    for name, ticker in yahoo_assets.items():
-        df = yf.download(ticker, progress=False)[["Close"]]
-        benchmark1[name] = df.rename(columns={"Close": name})
-
-    for name, series_id in fred_series.items():
-        data = fred.get_series(series_id)
-        df = pd.DataFrame(data, columns=[name])
-        df.index = pd.to_datetime(df.index)
-        benchmark1[name] = df
-
-    return benchmark1
-
-def compute_period_returns(benchmark1):
-    today = pd.Timestamp.today().normalize()
-
-    last_year = today.year - 1
-    start_last_year = pd.Timestamp(f"{last_year}-01-01")
-    end_last_year   = pd.Timestamp(f"{last_year}-12-31")
-    start_ytd = pd.Timestamp(f"{today.year}-01-01")
-
-    last_month_end   = today.replace(day=1) - pd.Timedelta(days=1)
-    last_month_start = last_month_end.replace(day=1)
-
-    label_last_year  = str(last_year)
-    label_ytd        = "YTD"
-    label_last_month = last_month_start.strftime("%b%y")
-
-    rows = []
-
-    for category, df in benchmark1.items():
-        series = df.iloc[:, 0].dropna()
-
-        try:
-            r_last_year = (series.loc[:end_last_year].iloc[-1] /
-                           series.loc[:start_last_year].iloc[-1] - 1) * 100
-        except:
-            r_last_year = None
-
-        try:
-            r_ytd = (series.iloc[-1] /
-                     series.loc[:start_ytd].iloc[-1] - 1) * 100
-        except:
-            r_ytd = None
-
-        try:
-            r_last_month = (series.iloc[-1] /
-                            series.loc[:last_month_start].iloc[-1] - 1) * 100
-        except:
-            r_last_month = None
-
-        rows.extend([
-            [category, label_last_year, r_last_year],
-            [category, label_ytd, r_ytd],
-            [category, label_last_month, r_last_month],
-        ])
-
-    return pd.DataFrame(rows, columns=["Category", "Period", "Value"])
+    def obtener_datos_fred():
+        codigos = {
+            # Labor Market
+            "Total Nonfarm Payrolls": "PAYEMS",
+            "Unemployment Rate": "UNRATE",
+            "Labor Force Participation Rate": "CIVPART",
+            "Job Openings (JOLTS)": "JTSJOL",
+            "Average Hourly Earnings (Total Private)": "CES0500000003",
+            "U-6 Unemployment Rate": "U6RATE",
+            "Quits Rate (JOLTS)": "JTSQUR",
+    
+            # Credit/Market
+            "Rating AAA": "BAMLC0A1CAAA",
+            "Rating AA": "BAMLC0A2CAA",
+            "Rating A": "BAMLC0A3CA",
+            "Rating BBB": "BAMLC0A4CBBB",
+            "BBB o superior": "BAMLC0A0CM",
+            "High Yield": "BAMLH0A0HYM2EY",
+            "Investment Grade": "BAMLC0A4CBBBEY",
+            "Rating AAA ": "BAMLC0A1CAAASYTW",
+            "Rating AA ": "BAMLC0A2CAASYTW",
+            "Rating A ": "BAMLC0A3CASYTW",
+            "Rating BBB ": "BAMLC0A4CBBBSYTW",
+            "High Yield ": "BAMLH0A0HYM2SYTW",
+            "10-Year Treasury Market Yield ": "DGS10",
+            "5-Year Inflation Expectation ": "T5YIFR",
+            "2-Year Treasury Market Yield ": "DGS2",
+            "Rating AAA Corporate Yield ": "BAMLC0A1CAAAEY",
+            
+            # YTW bonds to economic zone
+            "Global": "BAMLEMUBCRPIUSSYTW",
+            "Euro": "BAMLEMEBCRPIESYTW",
+            "Latin America": "BAMLEMRLCRPILASYTW",
+            "Asia": "BAMLEMRACRPIASIASYTW",
+            "EMEA": "BAMLEMRECRPIEMEASYTW",
+            
+            # Michingan Consumer Sentiment Index - MCSI
+         #   "MSCI": "UMCSENT",
+         #   "Home Purchase Sentiment Index":"HPSI",
+            
+            # Monetary Policy
+            "Inflation Expectation (University of Michigan)": "MICH",
+            "CPI":"CPIAUCSL",
+            "30-year Breakeven Inflation": "T30YIEM",
+            "5-Year Breakeven Inflation":"T5YIE",
+            
+            # Consumption
+           # "Retail Sales": "RSXFS",
+           # "S&P National Home Price Index":"CSUSHPINSA",
+           # "Personal Consumption Expenditures": "PCE",
+           # "Total Vehicle Sales": "TOTALSA"
+    
+        }
+        datos = {}
+        fred = Fred(api_key='762e2ee1c8fab5d038ce317929d47226')
+        for nombre, codigo in codigos.items():
+            serie = fred.get_series(codigo)
+            serie.name = nombre
+            datos[nombre] = serie
+        return datos
+    
+    def graficar_fred(datos, titulo, series, zoom=False):
+        fig = go.Figure()
+        for serie in series:
+            data = datos[serie].tail(30) if zoom else datos[serie]
+            fig.add_trace(go.Scatter(x=data.index, y=data.values, mode='lines', name=serie))
+        fig.update_layout(title=titulo, xaxis_title="Fecha", yaxis_title="Valor", template="plotly_white")
+        return fig
+    
+    @st.cache_data
+    def load_equity_table():
+        file_path = "data/indices_globales.xlsx"
+        return pd.read_excel(file_path)
+    
+    def render_percent(val):
+        if pd.isna(val) or val == 0:
+            return ""
+    
+        val_pct = val * 100
+        arrow = "▲" if val > 0 else "▼"
+        return f"{arrow} {val_pct:.2f}%"
+    
+    @st.cache_data(show_spinner=False)
+    def load_benchmarks():
+    
+        yahoo_assets = {
+            "Global equities": "SPY",
+            "GEM equities": "EEM",
+            "Global government bonds": "IGLO.L",
+            "Global EM government bonds": "LEMB",
+            "Gold": "GOLD",
+            "Other commodities": "^BCOM",
+            "Real estate": "REET",
+            "Crypto": "BTC-USD"
+        }
+    
+        fred_series = {
+            "Global HY corp bonds": "BAMLH0A0HYM2EY",
+            "Global IG corp bonds": "BAMLC0A0CMEY"
+        }
+    
+        benchmark1 = {}
+    
+        for name, ticker in yahoo_assets.items():
+            df = yf.download(ticker, progress=False)[["Close"]]
+            benchmark1[name] = df.rename(columns={"Close": name})
+    
+        for name, series_id in fred_series.items():
+            data = fred.get_series(series_id)
+            df = pd.DataFrame(data, columns=[name])
+            df.index = pd.to_datetime(df.index)
+            benchmark1[name] = df
+    
+        return benchmark1
+    
+    def compute_period_returns(benchmark1):
+        today = pd.Timestamp.today().normalize()
+    
+        last_year = today.year - 1
+        start_last_year = pd.Timestamp(f"{last_year}-01-01")
+        end_last_year   = pd.Timestamp(f"{last_year}-12-31")
+        start_ytd = pd.Timestamp(f"{today.year}-01-01")
+    
+        last_month_end   = today.replace(day=1) - pd.Timedelta(days=1)
+        last_month_start = last_month_end.replace(day=1)
+    
+        label_last_year  = str(last_year)
+        label_ytd        = "YTD"
+        label_last_month = last_month_start.strftime("%b%y")
+    
+        rows = []
+    
+        for category, df in benchmark1.items():
+            series = df.iloc[:, 0].dropna()
+    
+            try:
+                r_last_year = (series.loc[:end_last_year].iloc[-1] /
+                               series.loc[:start_last_year].iloc[-1] - 1) * 100
+            except:
+                r_last_year = None
+    
+            try:
+                r_ytd = (series.iloc[-1] /
+                         series.loc[:start_ytd].iloc[-1] - 1) * 100
+            except:
+                r_ytd = None
+    
+            try:
+                r_last_month = (series.iloc[-1] /
+                                series.loc[:last_month_start].iloc[-1] - 1) * 100
+            except:
+                r_last_month = None
+    
+            rows.extend([
+                [category, label_last_year, r_last_year],
+                [category, label_ytd, r_ytd],
+                [category, label_last_month, r_last_month],
+            ])
+    
+        return pd.DataFrame(rows, columns=["Category", "Period", "Value"])
 
     
 
