@@ -173,7 +173,6 @@ def render_percent(val):
     val_pct = val * 100
     arrow = "▲" if val > 0 else "▼"
     return f"{arrow} {val_pct:.2f}%"
-
 @st.cache_data(show_spinner=False)
 def load_benchmarks():
 
@@ -206,6 +205,7 @@ def load_benchmarks():
         benchmark1[name] = df
 
     return benchmark1
+
 
 def compute_period_returns(benchmark1):
     today = pd.Timestamp.today().normalize()
@@ -254,14 +254,15 @@ def compute_period_returns(benchmark1):
     return pd.DataFrame(rows, columns=["Category", "Period", "Value"])
 
 
+# --- Inputs de imagen de barras (GLOBAL, SIN INDENTACIÓN)
+@st.cache_data(show_spinner=False)
+def load_asset_class1():
+    benchmark1 = load_benchmarks()
+    return compute_period_returns(benchmark1)
 
-     # --- Inputs de imagen de barras
-    @st.cache_data(show_spinner=False)
-    def load_asset_class1():
-        benchmark1 = load_benchmarks()
-        return compute_period_returns(benchmark1)
-    
-    asset_class1 = load_asset_class1()
+
+asset_class1 = load_asset_class1()
+
 
 
     
