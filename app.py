@@ -46,6 +46,46 @@ def obtener_datos_tesoro(periodos):
         return pd.DataFrame()
 
 # --------------------------------------
+# FUNCION PARA INDICES
+def render_equity_table(df, height=420):
+    df_display = df.copy()
+
+    # Columnas porcentuales
+    cols_pct = ["Latest 7d", "MTD", "YTD", df_display.columns[-1]]
+    for col in cols_pct:
+        if col in df_display.columns:
+            df_display[col] = df_display[col].apply(render_percent)
+
+    # Level formatting
+    if "Level" in df_display.columns:
+        df_display["Level"] = df_display["Level"].apply(
+            lambda x: f"{x:,.2f}" if isinstance(x, (float, int)) and x != 0 else ""
+        )
+
+    fig = go.Figure(
+        data=[
+            go.Table(
+                header=dict(
+                    values=[f"<b>{v}</b>" for v in df_display.columns],
+                    fill_color="#003366",
+                    font=dict(color="white", size=14),
+                    align="center",
+                    height=40
+                ),
+                cells=dict(
+                    values=[df_display[col] for col in df_display.columns],
+                    align="center",
+                    height=32,
+                    font=dict(size=13)
+                )
+            )
+        ]
+    )
+
+    fig.update_layout(height=height)
+    return fig
+
+# --------------------------------------
 # FUNCIONES FRED
 # --------------------------------------
     
@@ -197,41 +237,62 @@ with tab1:
 with tab4:
     st.subheader("📊 Equity & Index Performance")
 
+    # 1) Cargar datos
     tabla = load_equity_table()
-    df_display = tabla.copy()
 
-    # Columnas porcentuales
-    cols_pct = ["Latest 7d", "MTD", "YTD", df_display.columns[-1]]
+    # ----------------------------
+    # 2) Índices globales
+    # ----------------------------
+    indices_a_mover = [
+        'MSCI Asia',
+        'MSCI EM LATAM',
+        'MSCI EM',
+        'MSCI Europe',
+        'MSCI USA'
+    ]
 
-    for col in cols_pct:
-        if col in df_display.columns:
-            df_display[col] = df_display[col].apply(render_percent)
+    tabla_global = tabla[tabla['Index'].isin(indices_a_mover)].copy()
+    tabla = tabla[~tabla['Index'].isin(indices_a_mover)].copy()
 
-    # Level formatting
-    if "Level" in df_display.columns:
-        df_display["Level"] = df_display["Level"].apply(
-            lambda x: f"{x:,.2f}" if isinstance(x, (float, int)) and x != 0 else ""
-        )
+    # ----------------------------
+    # 3) Índices sectoriales
+    # ----------------------------
+    indices_sectoriales = [
+        "NASDAQ-100 (Tech)",
+        "S&P500 Aerospace & Defense",
+        "Tecnología (XLK)",
+        "Salud",
+        "Finanzas",
+        "Energía",
+        "Consumo Discrecional",
+        "Industriales",
+        "Materiales",
+        "Servicios de Comunicación",
+        "Consumo Básico",
+        "Bienes Raíces",
+        "Servicios Públicos"
+    ]
 
-    fig = go.Figure(
-        data=[
-            go.Table(
-                header=dict(
-                    values=[f"<b>{v}</b>" for v in df_display.columns],
-                    fill_color="#003366",
-                    font=dict(color="white", size=14),
-                    align="center",
-                    height=40
-                ),
-                cells=dict(
-                    values=[df_display[col] for col in df_display.columns],
-                    align="center",
-                    height=32,
-                    font=dict(size=13)
-                )
-            )
-        ]
+    tabla_sectorial = tabla[tabla["Index"].isin(indices_sectoriales)].copy()
+    tabla_residual = tabla[~tabla['Index'].isin(indices_sectoriales)].copy()
+
+    # ----------------------------
+    # 4) Render de tablas
+    # ----------------------------
+    st.markdown("### 🌍 Global Equity Indices")
+    st.plotly_chart(
+        render_equity_table(tabla_global, height=360),
+        use_container_width=True
     )
 
-    fig.update_layout(height=520)
-    st.plotly_chart(fig, use_container_width=True)
+    st.markdown("### 🏭 Sector Indices")
+    st.plotly_chart(
+        render_equity_table(tabla_sectorial, height=520),
+        use_container_width=True
+    )
+
+    st.markdown("### 📌 Other Indices")
+    st.plotly_chart(
+        render_equity_table(tabla_residual, height=420),
+        use_container_width=True
+    )
