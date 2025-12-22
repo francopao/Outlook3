@@ -1,0 +1,10 @@
+streamlit
+pandas
+numpy
+plotly
+requests
+beautifulsoup4
+fredapi
+matplotlib
+openpyxl
+xlsxwriter
