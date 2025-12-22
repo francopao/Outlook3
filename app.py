@@ -210,37 +210,61 @@ def load_benchmarks():
 def compute_period_returns(benchmark1):
     today = pd.Timestamp.today().normalize()
 
-    # ---- Periodos dinámicos ----
     last_year = today.year - 1
-
-    # Primer día del año anterior
     start_last_year = pd.Timestamp(f"{last_year}-01-01")
-    end_last_year = pd.Timestamp(f"{last_year}-12-31")
-
-    # YTD
+    end_last_year   = pd.Timestamp(f"{last_year}-12-31")
     start_ytd = pd.Timestamp(f"{today.year}-01-01")
 
-    # Mes pasado completo
-    last_month_end = (today.replace(day=1) - pd.Timedelta(days=1))
+    last_month_end   = today.replace(day=1) - pd.Timedelta(days=1)
     last_month_start = last_month_end.replace(day=1)
 
-    # Etiquetas dinámicas
-    label_last_year = str(last_year)
-    label_ytd = "YTD"
-    label_last_month = last_month_start.strftime("%b%y")  # ej: "Nov25"
+    label_last_year  = str(last_year)
+    label_ytd        = "YTD"
+    label_last_month = last_month_start.strftime("%b%y")
 
     rows = []
-    # --- Inputs de imagen de barras
-    benchmark1 = load_benchmarks()
-    asset_class1 = compute_period_returns(benchmark1)
 
-    @st.cache_data
-    def load_asset_class_returns():
+    for category, df in benchmark1.items():
+        series = df.iloc[:, 0].dropna()
+
+        try:
+            r_last_year = (series.loc[:end_last_year].iloc[-1] /
+                           series.loc[:start_last_year].iloc[-1] - 1) * 100
+        except:
+            r_last_year = None
+
+        try:
+            r_ytd = (series.iloc[-1] /
+                     series.loc[:start_ytd].iloc[-1] - 1) * 100
+        except:
+            r_ytd = None
+
+        try:
+            r_last_month = (series.iloc[-1] /
+                            series.loc[:last_month_start].iloc[-1] - 1) * 100
+        except:
+            r_last_month = None
+
+        rows.extend([
+            [category, label_last_year, r_last_year],
+            [category, label_ytd, r_ytd],
+            [category, label_last_month, r_last_month],
+        ])
+
+    return pd.DataFrame(rows, columns=["Category", "Period", "Value"])
+
+
+     # --- Inputs de imagen de barras
+    @st.cache_data(show_spinner=False)
+    def load_asset_class1():
         benchmark1 = load_benchmarks()
         return compute_period_returns(benchmark1)
+
+    benchmark1 = load_benchmarks()
+    asset_class1 = load_asset_class1()
+
     
-    asset_class1 = load_asset_class_returns()
-    
+  
 
 
     # ---- Cálculo de rentabilidades ----
