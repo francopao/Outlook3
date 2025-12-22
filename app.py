@@ -253,14 +253,14 @@ def compute_period_returns(benchmark1):
 
     return pd.DataFrame(rows, columns=["Category", "Period", "Value"])
 
-    asset_class1 = load_asset_class1()
+    
 
      # --- Inputs de imagen de barras
     @st.cache_data(show_spinner=False)
     def load_asset_class1():
         benchmark1 = load_benchmarks()
-        return compute_period_returns(benchmark1)
-    
+    return compute_period_returns(benchmark1)
+    asset_class1 = load_asset_class1()
  
 
     
