@@ -375,8 +375,10 @@ with tab4:
         xaxis_title="Return",
         yaxis_title="Volatility",
         template="plotly_white",
-        height=520
-    )
+        height=520,
+        xaxis=dict(tickformat=".2%"),
+        yaxis=dict(tickformat=".2%"))
+    
     
     st.plotly_chart(fig, use_container_width=True)
     
