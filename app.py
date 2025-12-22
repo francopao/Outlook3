@@ -264,7 +264,12 @@ def load_asset_class1():
 asset_class1 = load_asset_class1()
     
 # ---- Cálculo de rentabilidades ----
-for category, df in benchmark1.items():
+def compute_period_returns_alt(benchmark1):
+
+    rows = []
+
+
+    for category, df in benchmark1.items():
 
     # La serie se supone que tiene solo 1 columna
     series = df.iloc[:, 0].dropna()
