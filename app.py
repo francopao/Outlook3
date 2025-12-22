@@ -256,12 +256,13 @@ def compute_period_returns(benchmark1):
     
 
      # --- Inputs de imagen de barras
-    @st.cache_data(show_spinner=False)
-    def load_asset_class1():
-            benchmark1 = load_benchmarks()
+@st.cache_data(show_spinner=False)
+def load_asset_class1():
+    benchmark1 = load_benchmarks()
     return compute_period_returns(benchmark1)
-    
-     
+
+asset_class1 = load_asset_class1()
+
 
     
     
@@ -308,7 +309,7 @@ def compute_period_returns(benchmark1):
     df_out = pd.DataFrame(rows, columns=["Category", "Period", "Value"])
     return df_out
 
-asset_class1 = load_asset_class1()
+
 # --------------------------------------
 # STREAMLIT UI
 # --------------------------------------
