@@ -521,24 +521,24 @@ with tab4:
     st.markdown("### Asset Class Performance")
 
     fig, ax = plt.subplots(figsize=(18, 6))
-
+    
     unique_periods = asset_class1["Period"].unique()
     period_year  = [p for p in unique_periods if p != "YTD" and p[:3].isdigit()]
     period_ytd   = ["YTD"]
     period_other = [p for p in unique_periods if p not in period_year and p != "YTD"]
     periods = period_year + period_ytd + period_other
-
+    
     color_map = {
         periods[0]: "black",
         periods[1]: "gray",
         periods[2]: "red"
     }
-
+    
     categories = asset_class1["Category"].unique()
     x = np.arange(len(categories))
     width = 0.28
     bars = {}
-
+    
     for i, period in enumerate(periods):
         subset = asset_class1[asset_class1["Period"] == period]
         values = subset["Value"].values
@@ -550,32 +550,42 @@ with tab4:
             color=color_map[period],
             label=period
         )
-
+    
     def add_labels(bar_container):
         for bar in bar_container:
             h = bar.get_height()
             offset = max(0.03 * abs(h), 0.5)
             y = h + offset if h >= 0 else h - offset
-            ax.text(bar.get_x() + bar.get_width()/2, y, f"{h:.1f}",
-                    ha="center", va="bottom" if h >= 0 else "top", fontsize=9)
-
+            ax.text(
+                bar.get_x() + bar.get_width()/2,
+                y,
+                f"{h:.1f}",
+                ha="center",
+                va="bottom" if h >= 0 else "top",
+                fontsize=9
+            )
+    
     for period in periods:
         add_labels(bars[period])
-
+    
     ax.axhline(0, color="black", linewidth=1)
-
+    
     wrapped = ["\n".join(textwrap.wrap(c, 18)) for c in categories]
     ax.set_xticks(x)
     ax.set_xticklabels(wrapped, fontsize=10)
     ax.set_ylabel("%")
-
-    ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.20),
-              ncol=3, frameon=False)
-
+    
+    ax.legend(
+        loc="upper center",
+        bbox_to_anchor=(0.5, -0.20),
+        ncol=3,
+        frameon=False
+    )
+    
     fig.tight_layout()
     st.pyplot(fig)
-
-
-
-
-
+    
+    
+    
+    
+    
