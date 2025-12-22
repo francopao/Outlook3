@@ -300,3 +300,84 @@ with tab4:
         render_equity_table(tabla_residual, height=420),
         use_container_width=True
     )
+
+import numpy as np
+
+    st.markdown("### 📈 Risk–Return & Efficient Frontier")
+
+# Selector de periodo
+current_year = datetime.now().year
+prev_year = current_year - 1
+
+periodo = st.selectbox(
+    "Selecciona periodo:",
+    ["YTD", str(prev_year)]
+)
+
+# Cargar data
+file_path = (
+    "data/volatilidad1.xlsx" if periodo == "YTD"
+    else "data/volatilidad2.xlsx"
+)
+
+df_vol = pd.read_excel(file_path)
+
+# Sectores permitidos
+indices_validos = [
+    "Salud", "S&P500 Aerospace & Defense", "Finanzas", "Energía",
+    "Consumo Discrecional", "Industriales", "Materiales",
+    "Servicios de Comunicación", "Consumo Básico",
+    "Bienes Raíces", "Servicios Públicos", "NASDAQ-100 (Tech)"
+]
+
+df_vol = df_vol[df_vol["Index"].isin(indices_validos)].copy()
+
+# -------------------------------
+# Frontera eficiente (envolvente)
+# -------------------------------
+df_vol = df_vol.sort_values("Volatility")
+frontier = []
+
+max_ret = -np.inf
+for _, row in df_vol.iterrows():
+    if row["Return"] > max_ret:
+        frontier.append(row)
+        max_ret = row["Return"]
+
+df_frontier = pd.DataFrame(frontier)
+
+# -------------------------------
+# Gráfico
+# -------------------------------
+fig = go.Figure()
+
+# Puntos
+fig.add_trace(go.Scatter(
+    x=df_vol["Return"],
+    y=df_vol["Volatility"],
+    mode="markers+text",
+    text=df_vol["Index"],
+    textposition="top center",
+    name="Assets"
+))
+
+# Frontera eficiente
+fig.add_trace(go.Scatter(
+    x=df_frontier["Return"],
+    y=df_frontier["Volatility"],
+    mode="lines",
+    name="Efficient Frontier"
+))
+
+fig.update_layout(
+    title=f"Risk–Return Profile ({periodo})",
+    xaxis_title="Return",
+    yaxis_title="Volatility",
+    template="plotly_white",
+    height=520
+)
+
+st.plotly_chart(fig, use_container_width=True)
+
+
+
