@@ -18,22 +18,6 @@ from io import StringIO
 # SCRAPER Y TRANSFORMADOR DE DATOS
 # --------------------------------------
 fred = Fred(api_key='762e2ee1c8fab5d038ce317929d47226')
-#@st.cache_data(show_spinner=False)
-def obtener_datos_tesoro(años):
-    df = pd.read_excel("data/df_tesoro.xlsx")
-
-    #  LIMPIEZA CLAVE
-    df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
-    df = df.dropna(subset=["Date"])
-
-    # usar columna Year (ya viene en el Excel)
-    df = df[df["Year"].isin(años)]
-
-    return df
-st.write("FUNCION EXISTE:", obtener_datos_tesoro)
-
-
-
 
 # --------------------------------------
 # FUNCION PARA INDICES
@@ -310,55 +294,129 @@ tab1, tab2, tab3, tab4 = st.tabs(["Treasury Yields", "US Corporate Bonds", "US L
 # TAB 1: CURVAS DEL TESORO
 # --------------------------------------    
 with tab1:
+    # -------------------------------
+    # CARGA DIRECTA DEL EXCEL
+    # -------------------------------
+    df = pd.read_excel("data/df_tesoro.xlsx")
+
+    # Limpieza mínima pero CLAVE
+    df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
+    df = df.dropna(subset=["Date"])
+
+    # Selector de años (últimos 3 por defecto)
+    años_disponibles = sorted(df["Year"].unique())
     años = st.multiselect(
         "Selecciona año(s):",
-        list(range(2023, 2026)),
-        default=[2025])
+        años_disponibles,
+        default=años_disponibles[-1:]
+    )
 
-    df = obtener_datos_tesoro(años)
+    df = df[df["Year"].isin(años)]
 
-
+    # -------------------------------
+    # VALIDACIÓN
+    # -------------------------------
     if not df.empty:
         st.success(f"{df.shape[0]} registros obtenidos.")
 
+        # ===============================
+        # FECHAS
+        # ===============================
         fechas = sorted(df["Date"].unique())
-        fechas_seleccionadas = st.multiselect("Selecciona una o más fechas para comparar curvas:", fechas[-10:], default=fechas[-3:])
+        fechas_seleccionadas = st.multiselect(
+            "Selecciona una o más fechas para comparar curvas:",
+            fechas[-10:],
+            default=fechas[-3:]
+        )
 
-        if "10 Yr" in df.columns and "2 Yr" in df.columns:
+        # ===============================
+        # SPREAD 10Y - 2Y
+        # ===============================
+        if {"10 Yr", "2 Yr"}.issubset(df.columns):
             df["Spread 10Y - 2Y"] = df["10 Yr"] - df["2 Yr"]
-            st.metric("📉 Spread 10Y - 2Y actual", f"{df['Spread 10Y - 2Y'].iloc[-1]:.2f} %")
-            fig_spread = px.line(df, x="Date", y="Spread 10Y - 2Y", title="Evolución del Spread 10Y - 2Y")
+            st.metric(
+                "📉 Spread 10Y - 2Y actual",
+                f"{df['Spread 10Y - 2Y'].iloc[-1]:.2f} %"
+            )
+
+            fig_spread = px.line(
+                df, x="Date", y="Spread 10Y - 2Y",
+                title="Evolución del Spread 10Y - 2Y"
+            )
             st.plotly_chart(fig_spread, use_container_width=True)
 
+        # ===============================
+        # CURVAS POR FECHA
+        # ===============================
         st.subheader("Comparación de curvas por fecha")
         fig_comparacion = px.line()
 
-        for fecha in fechas_seleccionadas:
-            datos_fecha = df[df["Date"] == fecha].iloc[0]
-            maturities = df.columns[2:-2]
-            tasas = datos_fecha[maturities].values.astype(float)
-            fig_comparacion.add_scatter(x=maturities, y=tasas, mode="lines+markers", name=str(fecha.date()))
+        maturities = [
+            col for col in df.columns
+            if col not in ["Date", "Year", "Spread 10Y - 2Y"]
+        ]
 
-        fig_comparacion.update_layout(title="Curvas de rendimiento comparadas", xaxis_title="Plazo", yaxis_title="Rendimiento (%)")
+        for fecha in fechas_seleccionadas:
+            fila = df[df["Date"] == fecha].iloc[0]
+            tasas = fila[maturities].astype(float).values
+
+            fig_comparacion.add_scatter(
+                x=maturities,
+                y=tasas,
+                mode="lines+markers",
+                name=fecha.strftime("%Y-%m-%d")
+            )
+
+        fig_comparacion.update_layout(
+            title="Curvas de rendimiento comparadas",
+            xaxis_title="Plazo",
+            yaxis_title="Rendimiento (%)"
+        )
         st.plotly_chart(fig_comparacion, use_container_width=True)
 
+        # ===============================
+        # ANIMACIÓN
+        # ===============================
         st.subheader("Rendimiento de los bonos del Tesoro a la par")
-        df_anim = df.copy()
-        df_anim = df_anim.melt(id_vars=["Date"], value_vars=maturities, var_name="Maturity", value_name="Yield")
 
-        fig_anim = px.line(df_anim, x="Maturity", y="Yield", animation_frame=df_anim["Date"].dt.strftime("%Y-%m-%d"),
-                        title="Evolución diaria de la curva de rendimiento")
-        fig_anim.update_layout(xaxis_title="Plazo", yaxis_title="Rendimiento (%)")
+        df_anim = df.melt(
+            id_vars=["Date"],
+            value_vars=maturities,
+            var_name="Maturity",
+            value_name="Yield"
+        )
+
+        fig_anim = px.line(
+            df_anim,
+            x="Maturity",
+            y="Yield",
+            animation_frame=df_anim["Date"].dt.strftime("%Y-%m-%d"),
+            title="Evolución diaria de la curva de rendimiento"
+        )
+        fig_anim.update_layout(
+            xaxis_title="Plazo",
+            yaxis_title="Rendimiento (%)"
+        )
         st.plotly_chart(fig_anim, use_container_width=True)
 
+        # ===============================
+        # EXPORTAR
+        # ===============================
         st.subheader("Exportar datos")
-        output = io.BytesIO()
-        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-            df.to_excel(writer, index=False, sheet_name='Yield Curve')
-            if "Spread 10Y - 2Y" in df.columns:
-                df[['Date', 'Spread 10Y - 2Y']].to_excel(writer, index=False, sheet_name='Spread')
 
-        st.download_button(label="⬇️ Descargar Excel", data=output.getvalue(), file_name="treasury_yield_curve.xlsx")
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
+            df.to_excel(writer, index=False, sheet_name="Yield Curve")
+            if "Spread 10Y - 2Y" in df.columns:
+                df[["Date", "Spread 10Y - 2Y"]].to_excel(
+                    writer, index=False, sheet_name="Spread"
+                )
+
+        st.download_button(
+            label="⬇️ Descargar Excel",
+            data=output.getvalue(),
+            file_name="treasury_yield_curve.xlsx"
+        )
 
     else:
         st.warning("No se encontraron datos para los años seleccionados.")
