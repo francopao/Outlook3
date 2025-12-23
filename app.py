@@ -523,74 +523,144 @@ with tab4:
     
     st.plotly_chart(fig, use_container_width=True)
 
-    st.markdown("### Asset Class Performance")
+    st.header("Análisis de Activos Globales (FRED & Yahoo Finance)")
+    fred = Fred(api_key=api_key)
 
-    fig, ax = plt.subplots(figsize=(18, 6))
+    # Definición de activos
+    yahoo_assets = {
+        "Global equities": "SPY",
+        "GEM equities": "EEM",
+        "Global government bonds": "IGLO.L",
+        "Global EM government bonds": "LEMB",
+        "Gold": "GOLD",
+        "Other commodities": "^BCOM",
+        "Real estate": "REET",
+        "Crypto": "BTC-USD"
+    }
+
+    fred_series = {
+        "Global HY corp bonds": "BAMLH0A0HYM2EY",
+        "Global IG corp bonds": "BAMLC0A0CMEY"
+    }
+
+    # 2) Descarga de datos con indicador de carga
+    with st.spinner('Descargando datos financieros...'):
+        benchmark1 = {}
+
+        # Descarga Yahoo Finance
+        for name, ticker in yahoo_assets.items():
+            try:
+                df = yf.download(ticker, progress=False)[["Close"]]
+                df = df.rename(columns={"Close": name})
+                benchmark1[name] = df
+            except Exception as e:
+                st.error(f"Error descargando {ticker}: {e}")
+
+        # Descarga FRED
+        for name, series_id in fred_series.items():
+            try:
+                data = fred.get_series(series_id)
+                df = pd.DataFrame(data, columns=[name])
+                df.index = pd.to_datetime(df.index)
+                benchmark1[name] = df
+            except Exception as e:
+                st.error(f"Error descargando {series_id}: {e}")
+
+    # 3) Mostrar resumen de carga
+    st.success(f"Se han descargado {len(benchmark1)} series correctamente.")
+    
+    # Reemplazo de los prints de Spyder por un expansor en Streamlit
+    with st.expander("Ver lista de series descargadas"):
+        for key in benchmark1.keys():
+            st.write(f"- {key}")
+
+    # --- Función de cálculo (puedes sacarla del bloque 'with' si prefieres) ---
+    def compute_period_returns(benchmark_dict):
+        today = pd.Timestamp.today().normalize()
+        last_year = today.year - 1
+        start_last_year = pd.Timestamp(f"{last_year}-01-01")
+        end_last_year = pd.Timestamp(f"{last_year}-12-31")
+        start_ytd = pd.Timestamp(f"{today.year}-01-01")
+        last_month_end = (today.replace(day=1) - pd.Timedelta(days=1))
+        last_month_start = last_month_end.replace(day=1)
+
+        label_last_year = str(last_year)
+        label_ytd = "YTD"
+        label_last_month = last_month_start.strftime("%b%y")
+
+        rows = []
+        for category, df in benchmark_dict.items():
+            series = df.iloc[:, 0].dropna()
+            # Lógica de retornos (se mantiene igual que tu original)
+            try:
+                p_start = series.loc[:start_last_year].iloc[-1]
+                p_end = series.loc[:end_last_year].iloc[-1]
+                r_ly = (p_end / p_start - 1) * 100
+            except: r_ly = None
+            
+            try:
+                p_start = series.loc[:start_ytd].iloc[-1]
+                p_end = series.iloc[-1]
+                r_ytd = (p_end / p_start - 1) * 100
+            except: r_ytd = None
+
+            try:
+                p_start = series.loc[:last_month_start].iloc[-1]
+                p_end = series.iloc[-1]
+                r_lm = (p_end / p_start - 1) * 100
+            except: r_lm = None
+
+            rows.append([category, label_last_year, r_ly])
+            rows.append([category, label_ytd, r_ytd])
+            rows.append([category, label_last_month, r_lm])
+
+        return pd.DataFrame(rows, columns=["Category", "Period", "Value"])
+
+    # Ejecutar cálculo
+    asset_class1 = compute_period_returns(benchmark1)
+
+    # 4) Gráfico Matplotlib
+    st.subheader("Visualización de Rentabilidades")
     
     unique_periods = asset_class1["Period"].unique()
-    period_year  = [p for p in unique_periods if p != "YTD" and p[:3].isdigit()]
-    period_ytd   = ["YTD"]
+    period_year = [p for p in unique_periods if p != "YTD" and p[:3].isdigit()]
+    period_ytd = ["YTD"]
     period_other = [p for p in unique_periods if p not in period_year and p != "YTD"]
     periods = period_year + period_ytd + period_other
-    
-    color_map = {
-        periods[0]: "black",
-        periods[1]: "gray",
-        periods[2]: "red"
-    }
-    
+
+    color_map = {periods[0]: "black", periods[1]: "gray", periods[2]: "red"}
+
+    fig, ax = plt.subplots(figsize=(12, 6)) # Usar fig, ax es mejor para Streamlit
     categories = asset_class1["Category"].unique()
     x = np.arange(len(categories))
     width = 0.28
-    bars = {}
-    
+
     for i, period in enumerate(periods):
         subset = asset_class1[asset_class1["Period"] == period]
-        values = [subset.loc[subset["Category"] == c, "Value"].values[0]
-        if c in subset["Category"].values else np.nan
-        for c in categories]
-
+        values = subset["Value"].values
         offset = (i - 1) * width
-        bars[period] = ax.bar(
-            x + offset,
-            values,
-            width,
-            color=color_map[period],
-            label=period
-        )
-    
-    def add_labels(bar_container):
-        for bar in bar_container:
-            h = bar.get_height()
-            offset = max(0.03 * abs(h), 0.5)
-            y = h + offset if h >= 0 else h - offset
-            ax.text(
-                bar.get_x() + bar.get_width()/2,
-                y,
-                f"{h:.1f}",
-                ha="center",
-                va="bottom" if h >= 0 else "top",
-                fontsize=9
-            )
-    
-    for period in periods:
-        add_labels(bars[period])
-    
+        rects = ax.bar(x + offset, values, width, color=color_map[period], label=period)
+        
+        # Etiquetas sobre barras
+        for bar in rects:
+            height = bar.get_height()
+            if not np.isnan(height):
+                ax.text(bar.get_x() + bar.get_width()/2, 
+                        height + (0.5 if height >= 0 else -1.5),
+                        f"{height:.1f}", ha="center", va="bottom" if height >= 0 else "top", fontsize=8)
+
     ax.axhline(0, color="black", linewidth=1)
-    
-    wrapped = ["\n".join(textwrap.wrap(c, 18)) for c in categories]
+    wrapped_labels = ["\n".join(textwrap.wrap(label, width=12)) for label in categories]
     ax.set_xticks(x)
-    ax.set_xticklabels(wrapped, fontsize=10)
-    ax.set_ylabel("%")
+    ax.set_xticklabels(wrapped_labels, fontsize=9)
+    ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.15), ncol=3, frameon=False)
     
-    ax.legend(
-        loc="upper center",
-        bbox_to_anchor=(0.5, -0.20),
-        ncol=3,
-        frameon=False
-    )
-    
-    fig.tight_layout()
+    # Ajustar límites del eje Y
+    ymin, ymax = asset_class1["Value"].min(), asset_class1["Value"].max()
+    padding = (ymax - ymin) * 0.2
+    ax.set_ylim(ymin - padding, ymax + padding)
+
+    # Mostrar en Streamlit
     st.pyplot(fig)
     
     
