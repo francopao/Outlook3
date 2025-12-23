@@ -19,14 +19,18 @@ from io import StringIO
 # --------------------------------------
 fred = Fred(api_key='762e2ee1c8fab5d038ce317929d47226')
 @st.cache_data(show_spinner=False)
-def load_treasury_from_excel():
-    df = pd.read_excel("data/treasury_yield_curve.xlsx")
+def obtener_datos_tesoro(años):
+    df = pd.read_excel("data/df_tesoro.xlsx")
 
-    # Asegurar tipos correctos
-    df["Date"] = pd.to_datetime(df["Date"])   # mantiene 00:00:00
-    df["Year"] = df["Year"].astype(int)
+    #  LIMPIEZA CLAVE
+    df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
+    df = df.dropna(subset=["Date"])
+
+    # usar columna Year (ya viene en el Excel)
+    df = df[df["Year"].isin(años)]
 
     return df
+
 
 
 
@@ -306,7 +310,7 @@ tab1, tab2, tab3, tab4 = st.tabs(["Treasury Yields", "US Corporate Bonds", "US L
 # --------------------------------------    
 with tab1:
     años = st.multiselect("Selecciona año(s):", list(range(2006, 2026)), default=[2025])
-    df = load_treasury_from_excel(años)
+    df = obtener_datos_tesoro(años)
 
     if not df.empty:
         st.success(f"{df.shape[0]} registros obtenidos.")
