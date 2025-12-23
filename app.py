@@ -19,36 +19,51 @@ import yfinance as yf
 # --------------------------------------
 fred = Fred(api_key='762e2ee1c8fab5d038ce317929d47226')
 @st.cache_data
+
 def obtener_datos_tesoro(periodos):
     all_data = []
-    headers = []
+
     for year in periodos:
-        url = f'https://home.treasury.gov/resource-center/data-chart-center/interest-rates/TextView?type=daily_treasury_yield_curve&field_tdr_date_value={year}'
-        response = requests.get(url)
+        url = (
+            "https://home.treasury.gov/resource-center/data-chart-center/"
+            "interest-rates/TextView"
+            f"?type=daily_treasury_yield_curve&field_tdr_date_value={year}"
+        )
 
-        if response.status_code == 200:
-            soup = BeautifulSoup(response.content, 'html.parser')
-            table = soup.find('table', {'class': 'usa-table views-table views-view-table cols-26'})
-            if table:
-                headers = [header.text.strip() for header in table.find_all('th')]
-                for row in table.find_all('tr')[1:]:
-                    cells = [year] + [cell.text.strip() for cell in row.find_all('td')]
-                    all_data.append(cells)
+        try:
+            df_year = pd.read_html(url)[0]
+        except ValueError:
+            # Por si algún año no devuelve tabla
+            continue
 
-    if all_data:
-        headers = ['Year'] + headers
-        df = pd.DataFrame(all_data, columns=headers)
-        df = df.drop(columns=['1.5 Mo'], errors='ignore')
-        df = df.apply(lambda x: x.replace('N/A', pd.NA) if x.dtype == "object" else x)
-        df = df.dropna(axis=1, how='all')
-        df = df.fillna(0)
-        for col in df.columns[2:]:
-            df[col] = pd.to_numeric(df[col], errors='coerce')
-        df["Date"] = pd.to_datetime(df["Date"])
-        df = df.sort_values("Date")
-        return df
-    else:
+        # Limpieza básica
+        df_year.columns = df_year.columns.str.strip()
+        df_year["Date"] = pd.to_datetime(df_year["Date"])
+        df_year["Year"] = year
+
+        all_data.append(df_year)
+
+    if not all_data:
         return pd.DataFrame()
+
+    # Consolidar todos los años
+    df = pd.concat(all_data, ignore_index=True)
+
+    # Mantener tu lógica original de limpieza
+    df = df.drop(columns=["1.5 Mo"], errors="ignore")
+    df = df.replace("N/A", pd.NA)
+    df = df.dropna(axis=1, how="all")
+    df = df.fillna(0)
+
+    # Convertir a numérico (excepto Date y Year)
+    for col in df.columns:
+        if col not in ["Date", "Year"]:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+
+    df = df.sort_values("Date").reset_index(drop=True)
+
+    return df
+
 
 # --------------------------------------
 # FUNCION PARA INDICES
