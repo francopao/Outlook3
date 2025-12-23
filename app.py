@@ -20,6 +20,8 @@ from io import StringIO
 fred = Fred(api_key='762e2ee1c8fab5d038ce317929d47226')
 @st.cache_data
 
+
+
 def obtener_datos_tesoro(periodos):
     all_data = []
 
@@ -39,16 +41,27 @@ def obtener_datos_tesoro(periodos):
         if response.status_code != 200:
             continue
 
-        try:
-            df_year = pd.read_html(
-                StringIO(response.text),
-                flavor="bs4"
-            )[0]
-        except ValueError:
+        soup = BeautifulSoup(response.text, "html.parser")
+
+        table = soup.find("table", id="DataTables_Table_0")
+        if table is None:
             continue
 
-        df_year.columns = df_year.columns.str.strip()
-        df_year["Date"] = pd.to_datetime(df_year["Date"])
+        # Headers
+        headers = [th.get_text(strip=True) for th in table.find("thead").find_all("th")]
+
+        # Filas
+        rows = []
+        for tr in table.find("tbody").find_all("tr"):
+            rows.append([td.get_text(strip=True) for td in tr.find_all("td")])
+
+        if not rows:
+            continue
+
+        df_year = pd.DataFrame(rows, columns=headers)
+
+        # Tipos y limpieza
+        df_year["Date"] = pd.to_datetime(df_year["Date"], errors="coerce")
         df_year["Year"] = year
 
         all_data.append(df_year)
@@ -58,6 +71,7 @@ def obtener_datos_tesoro(periodos):
 
     df = pd.concat(all_data, ignore_index=True)
 
+    # Mantener tu lógica original
     df = df.drop(columns=["1.5 Mo"], errors="ignore")
     df = df.replace("N/A", pd.NA)
     df = df.dropna(axis=1, how="all")
@@ -70,6 +84,7 @@ def obtener_datos_tesoro(periodos):
     df = df.sort_values("Date").reset_index(drop=True)
 
     return df
+
 
 
 # --------------------------------------
