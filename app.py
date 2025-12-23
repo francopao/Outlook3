@@ -546,7 +546,10 @@ with tab4:
     
     for i, period in enumerate(periods):
         subset = asset_class1[asset_class1["Period"] == period]
-        values = subset["Value"].values
+        values = [subset.loc[subset["Category"] == c, "Value"].values[0]
+        if c in subset["Category"].values else np.nan
+        for c in categories]
+
         offset = (i - 1) * width
         bars[period] = ax.bar(
             x + offset,
