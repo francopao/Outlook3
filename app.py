@@ -12,6 +12,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import textwrap
 from dateutil.relativedelta import relativedelta
+import yfinance as yf
+
 # --------------------------------------
 # SCRAPER Y TRANSFORMADOR DE DATOS
 # --------------------------------------
