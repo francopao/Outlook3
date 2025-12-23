@@ -13,15 +13,18 @@ import numpy as np
 import textwrap
 from dateutil.relativedelta import relativedelta
 import yfinance as yf
-
+from io import StringIO
 # --------------------------------------
 # SCRAPER Y TRANSFORMADOR DE DATOS
 # --------------------------------------
 fred = Fred(api_key='762e2ee1c8fab5d038ce317929d47226')
 @st.cache_data
-
 def obtener_datos_tesoro(periodos):
     all_data = []
+
+    headers_req = {
+        "User-Agent": "Mozilla/5.0"
+    }
 
     for year in periodos:
         url = (
@@ -30,13 +33,17 @@ def obtener_datos_tesoro(periodos):
             f"?type=daily_treasury_yield_curve&field_tdr_date_value={year}"
         )
 
-        try:
-            df_year = pd.read_html(url)[0]
-        except ValueError:
-            # Por si algún año no devuelve tabla
+        response = requests.get(url, headers=headers_req, timeout=30)
+
+        if response.status_code != 200:
             continue
 
-        # Limpieza básica
+        try:
+            df_year = pd.read_html(StringIO(response.text))[0]
+        except ValueError:
+            continue
+
+        # Limpieza estándar
         df_year.columns = df_year.columns.str.strip()
         df_year["Date"] = pd.to_datetime(df_year["Date"])
         df_year["Year"] = year
@@ -46,16 +53,14 @@ def obtener_datos_tesoro(periodos):
     if not all_data:
         return pd.DataFrame()
 
-    # Consolidar todos los años
     df = pd.concat(all_data, ignore_index=True)
 
-    # Mantener tu lógica original de limpieza
+    # Mantener tu lógica original
     df = df.drop(columns=["1.5 Mo"], errors="ignore")
     df = df.replace("N/A", pd.NA)
     df = df.dropna(axis=1, how="all")
     df = df.fillna(0)
 
-    # Convertir a numérico (excepto Date y Year)
     for col in df.columns:
         if col not in ["Date", "Year"]:
             df[col] = pd.to_numeric(df[col], errors="coerce")
