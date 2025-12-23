@@ -30,6 +30,7 @@ def obtener_datos_tesoro(años):
     df = df[df["Year"].isin(años)]
 
     return df
+st.write("FUNCION EXISTE:", obtener_datos_tesoro)
 
 
 
