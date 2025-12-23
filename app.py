@@ -18,10 +18,7 @@ from io import StringIO
 # SCRAPER Y TRANSFORMADOR DE DATOS
 # --------------------------------------
 fred = Fred(api_key='762e2ee1c8fab5d038ce317929d47226')
-@st.cache_data
-
-
-
+@st.cache_data(show_spinner=False)
 def obtener_datos_tesoro(periodos):
     all_data = []
 
