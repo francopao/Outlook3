@@ -39,7 +39,8 @@ def obtener_datos_tesoro(periodos):
             continue
 
         try:
-            df_year = pd.read_html(StringIO(response.text))[0]
+            df_year = pd.read_html(StringIO(response.text),flavor="bs4")[0]
+
         except ValueError:
             continue
 
