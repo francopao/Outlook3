@@ -18,36 +18,13 @@ from io import StringIO
 # SCRAPER Y TRANSFORMADOR DE DATOS
 # --------------------------------------
 fred = Fred(api_key='762e2ee1c8fab5d038ce317929d47226')
-st.cache_data.clear()
+@st.cache_data(show_spinner=False)
+def load_treasury_from_excel():
+    df = pd.read_excel("data/treasury_yield_curve.xlsx")
 
-import pandas as pd
-
-def obtener_datos_tesoro(periodos):
-    url = (
-        "https://home.treasury.gov/resource-center/data-chart-center/"
-        "interest-rates/daily-treasury-rates.csv"
-    )
-
-    df = pd.read_csv(url)
-
-    # Normalizar nombres
-    df.columns = df.columns.str.strip()
-    df["Date"] = pd.to_datetime(df["Date"])
-
-    # Filtrar años
-    df = df[df["Date"].dt.year.isin(periodos)]
-
-    # Mantener tu lógica
-    df = df.drop(columns=["1.5 Mo"], errors="ignore")
-    df = df.replace("N/A", pd.NA)
-    df = df.dropna(axis=1, how="all")
-    df = df.fillna(0)
-
-    for col in df.columns:
-        if col != "Date":
-            df[col] = pd.to_numeric(df[col], errors="coerce")
-
-    df = df.sort_values("Date").reset_index(drop=True)
+    # Asegurar tipos correctos
+    df["Date"] = pd.to_datetime(df["Date"])   # mantiene 00:00:00
+    df["Year"] = df["Year"].astype(int)
 
     return df
 
