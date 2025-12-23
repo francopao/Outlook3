@@ -10,3 +10,4 @@ openpyxl
 xlsxwriter
 fear_and_greed
 yfinance
+lxml
