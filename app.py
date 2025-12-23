@@ -17,7 +17,7 @@ import yfinance as yf
 # --------------------------------------
 # SCRAPER Y TRANSFORMADOR DE DATOS
 # --------------------------------------
-
+fred = Fred(api_key='762e2ee1c8fab5d038ce317929d47226')
 @st.cache_data
 def obtener_datos_tesoro(periodos):
     all_data = []
@@ -148,7 +148,7 @@ def obtener_datos_fred():
 
     }
     datos = {}
-    fred = Fred(api_key='762e2ee1c8fab5d038ce317929d47226')
+    # fred = Fred(api_key='762e2ee1c8fab5d038ce317929d47226')
     for nombre, codigo in codigos.items():
         serie = fred.get_series(codigo)
         serie.name = nombre
