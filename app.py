@@ -654,9 +654,9 @@ with tab4:
 
 
 
-    st.header("Benchmarks of Peruvian Mutual Funds")
+    st.header("Benchmark: Peruvian Mutual Funds")
 
-    # 1) Definición de ETFs (Igual que antes)
+    # 1) Definición de ETFs
     etfs = { 
         "FIXED INCOME": [
             ("AGG", "iShares Core U.S. Aggregate Bond ETF"), ("JNK", "SPDR Bloomberg High Yield Bond ETF"),
@@ -674,11 +674,11 @@ with tab4:
         ]
     }
 
-    # 2) Fechas y Descarga (Optimizada con asof)
+    # 2) Configuración de Fechas
     today = datetime.today()
-    start_ly = f"{today.year - 1}-01-01"
-    end_ly = f"{today.year - 1}-12-31"
-    start_ytd = f"{today.year}-01-01"
+    start_ly = datetime(today.year - 1, 1, 1)
+    end_ly = datetime(today.year - 1, 12, 31)
+    start_ytd = datetime(today.year, 1, 1)
 
     @st.cache_data(ttl=3600)
     def get_plotly_data(_etfs_dict):
@@ -686,95 +686,120 @@ with tab4:
         for category, items in _etfs_dict.items():
             for ticker, name in items:
                 try:
-                    data = yf.download(ticker, start=start_ly, progress=False)
-                    if data.empty: continue
+                    # Descargamos con un margen de seguridad para asegurar que asof encuentre datos
+                    df = yf.download(ticker, start="2023-12-20", progress=False)
                     
-                    # Limpieza de MultiIndex si existe
-                    close = data['Close'].iloc[:, 0] if isinstance(data['Close'], pd.DataFrame) else data['Close']
-                    close = close.dropna()
+                    if df.empty:
+                        continue
 
-                    # Cálculos robustos
-                    p_start_ly = close.loc[close.index.asof(start_ly)]
-                    p_end_ly = close.loc[close.index.asof(end_ly)]
-                    last_year_ret = round((p_end_ly / p_start_ly - 1) * 100, 2)
+                    # CORRECCIÓN CLAVE: Extraer 'Close' de forma plana independientemente del formato de Yahoo
+                    if 'Close' in df.columns:
+                        close_data = df['Close']
+                        # Si es un DataFrame (MultiIndex), tomamos la primera columna
+                        if isinstance(close_data, pd.DataFrame):
+                            series = close_data.iloc[:, 0]
+                        else:
+                            series = close_data
+                        
+                        series = series.dropna()
+                        
+                        if series.empty:
+                            continue
 
-                    p_start_ytd = close.loc[close.index.asof(start_ytd)]
-                    p_end_now = close.iloc[-1]
-                    ytd_ret = round((p_end_now / p_start_ytd - 1) * 100, 2)
+                        # Búsqueda robusta de precios (asof busca la fecha exacta o la anterior más cercana)
+                        p_start_ly = series.loc[series.index.asof(pd.Timestamp(start_ly))]
+                        p_end_ly = series.loc[series.index.asof(pd.Timestamp(end_ly))]
+                        p_start_ytd = series.loc[series.index.asof(pd.Timestamp(start_ytd))]
+                        p_now = series.iloc[-1]
 
-                    rows.append({"Category": category, "Name": name, "Last Year": last_year_ret, "YTD": ytd_ret})
-                except: continue
+                        last_year_ret = round(((p_end_ly / p_start_ly) - 1) * 100, 2)
+                        ytd_ret = round(((p_now / p_start_ytd) - 1) * 100, 2)
+
+                        rows.append({
+                            "Category": category, 
+                            "Name": name, 
+                            "Last Year": last_year_ret, 
+                            "YTD": ytd_ret
+                        })
+                except Exception as e:
+                    print(f"Error en {ticker}: {e}")
+                    continue
         return pd.DataFrame(rows)
 
-    with st.spinner("Generando gráfico interactivo..."):
+    with st.spinner("Descargando y procesando datos de Yahoo Finance..."):
         df_bench = get_plotly_data(etfs)
 
+    # 3) Construcción del Gráfico si hay datos
     if not df_bench.empty:
-        # 3) Crear figura de Plotly
         fig = go.Figure()
 
-        # Barra de Last Year
+        # Barra Año Pasado
         fig.add_trace(go.Bar(
             x=df_bench["Name"],
             y=df_bench["Last Year"],
             name=f"Año Pasado ({today.year - 1})",
             marker_color='silver',
             text=df_bench["Last Year"].apply(lambda x: f"{x}%"),
-            textposition='auto',
+            textposition='outside',
+            cliponaxis=False
         ))
 
-        # Barra de YTD
+        # Barra YTD
         fig.add_trace(go.Bar(
             x=df_bench["Name"],
             y=df_bench["YTD"],
             name="YTD",
             marker_color='#0A1A44',
             text=df_bench["YTD"].apply(lambda x: f"{x}%"),
-            textposition='auto',
+            textposition='outside',
+            cliponaxis=False
         ))
 
-        # 4) Personalización estética (Superando a Matplotlib)
+        # Layout y Estética
         fig.update_layout(
-            title_text="Useful Benchmark in Peruvian Mutual Funds",
-            title_x=0.5,
+            title=dict(text="Useful Benchmark in Peruvian Mutual Funds", x=0.5, font=dict(size=20)),
             barmode='group',
             template="plotly_white",
-            height=600,
-            margin=dict(t=100, b=100), # Espacio para los títulos de categoría arriba
-            legend=dict(orientation="h", yanchor="bottom", y=-0.3, xanchor="center", x=0.5),
+            height=700,
+            margin=dict(t=120, b=120, l=50, r=50),
+            legend=dict(orientation="h", yanchor="bottom", y=-0.4, xanchor="center", x=0.5),
             yaxis_title="% Retorno",
+            hovermode="x unified"
         )
 
-        # Envolver nombres largos en el eje X
+        # Ajuste de etiquetas del Eje X
         fig.update_xaxes(
             tickvals=df_bench["Name"],
             ticktext=[label.replace(" ", "<br>") for label in df_bench["Name"]],
-            tickfont=dict(size=10)
+            tickfont=dict(size=10),
+            showgrid=False
         )
 
-        # 5) Líneas divisorias y Etiquetas de Categoría (Dinámico)
+        # 4) Divisores y Etiquetas de Categoría
         cumulative_count = 0
+        # Calculamos el máximo para posicionar los títulos de categoría
+        max_val = max(df_bench["Last Year"].max(), df_bench["YTD"].max())
+
         for category, items in etfs.items():
-            count = len(items)
-            # Línea divisoria
-            if cumulative_count > 0:
-                fig.add_vline(x=cumulative_count - 0.5, line_width=1, line_dash="dash", line_color="gray")
+            count = len([x for x in df_bench["Category"] if x == category])
+            if count == 0: continue
             
-            # Etiqueta de categoría arriba
+            if cumulative_count > 0:
+                fig.add_vline(x=cumulative_count - 0.5, line_width=1, line_dash="dash", line_color="lightgray")
+            
             fig.add_annotation(
                 x=cumulative_count + (count-1)/2,
-                y=1.1, # Posición relativa arriba del gráfico
+                y=1.1,
                 yref="paper",
                 text=f"<b>{category}</b>",
                 showarrow=False,
-                font=dict(size=14)
+                font=dict(size=13, color="black")
             )
             cumulative_count += count
 
-        # Mostrar en Streamlit
         st.plotly_chart(fig, use_container_width=True)
     else:
-        st.warning("No se pudieron obtener datos para el gráfico.")
+        st.error("No se pudieron obtener datos. Por favor, verifica tu conexión a internet o intenta recargar la página.")
 
 
 
