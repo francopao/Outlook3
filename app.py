@@ -18,7 +18,7 @@ from io import StringIO
 # SCRAPER Y TRANSFORMADOR DE DATOS
 # --------------------------------------
 fred = Fred(api_key='762e2ee1c8fab5d038ce317929d47226')
-@st.cache_data(show_spinner=False)
+#@st.cache_data(show_spinner=False)
 def obtener_datos_tesoro(años):
     df = pd.read_excel("data/df_tesoro.xlsx")
 
@@ -309,8 +309,13 @@ tab1, tab2, tab3, tab4 = st.tabs(["Treasury Yields", "US Corporate Bonds", "US L
 # TAB 1: CURVAS DEL TESORO
 # --------------------------------------    
 with tab1:
-    años = st.multiselect("Selecciona año(s):", list(range(2006, 2026)), default=[2025])
+    años = st.multiselect(
+        "Selecciona año(s):",
+        list(range(2023, 2026)),
+        default=[2025])
+
     df = obtener_datos_tesoro(años)
+
 
     if not df.empty:
         st.success(f"{df.shape[0]} registros obtenidos.")
