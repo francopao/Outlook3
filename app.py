@@ -148,7 +148,7 @@ def obtener_datos_fred():
 
     }
     datos = {}
-    # fred = Fred(api_key='762e2ee1c8fab5d038ce317929d47226')
+
     for nombre, codigo in codigos.items():
         serie = fred.get_series(codigo)
         serie.name = nombre
@@ -524,6 +524,7 @@ with tab4:
     st.plotly_chart(fig, use_container_width=True)
 
     st.header("Análisis de Activos Globales (FRED & Yahoo Finance)")
+    api_key = "762e2ee1c8fab5d038ce317929d47226"
     fred = Fred(api_key=api_key)
 
     # Definición de activos
