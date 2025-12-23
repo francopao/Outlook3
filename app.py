@@ -523,134 +523,134 @@ with tab4:
     
     st.plotly_chart(fig, use_container_width=True)
 
-st.header("Análisis de Activos Globales")
+    st.header("Análisis de Activos Globales")
+        
+        api_key = "762e2ee1c8fab5d038ce317929d47226"
+        fred = Fred(api_key=api_key)
     
-    api_key = "762e2ee1c8fab5d038ce317929d47226"
-    fred = Fred(api_key=api_key)
-
-    yahoo_assets = {
-        "Global equities": "SPY",
-        "GEM equities": "EEM",
-        "Global government bonds": "IGLO.L",
-        "Global EM government bonds": "LEMB",
-        "Gold": "GOLD",
-        "Other commodities": "^BCOM",
-        "Real estate": "REET",
-        "Crypto": "BTC-USD"
-    }
-
-    fred_series = {
-        "Global HY corp bonds": "BAMLH0A0HYM2EY",
-        "Global IG corp bonds": "BAMLC0A0CMEY"
-    }
-
-    # --- DESCARGA DE DATOS CORREGIDA ---
-    @st.cache_data(ttl=3600) # Caché para no descargar cada vez que muevas algo
-    def get_all_data():
-        data_dict = {}
-        
-        # Yahoo Finance
-        for name, ticker in yahoo_assets.items():
-            try:
-                # auto_adjust=True y flat_header evitan problemas de formato
-                df = yf.download(ticker, progress=False, period="max")
-                if not df.empty:
-                    # Forzamos a que sea una serie simple de precios de cierre
-                    # Usamos .iloc[:, 0] por si yfinance devuelve MultiIndex
-                    series = df['Close'].iloc[:, 0] if isinstance(df['Close'], pd.DataFrame) else df['Close']
-                    data_dict[name] = pd.DataFrame(series).rename(columns={series.name: name})
-            except Exception as e:
-                st.warning(f"Error con {name}: {e}")
-
-        # FRED
-        for name, series_id in fred_series.items():
-            try:
-                s = fred.get_series(series_id)
-                data_dict[name] = pd.DataFrame(s, columns=[name])
-            except:
-                pass
-        return data_dict
-
-    benchmark1 = get_all_data()
-
-    # --- LÓGICA DE CÁLCULO ---
-    def compute_period_returns(data):
-        today = pd.Timestamp.today().normalize()
-        # Ajuste para pruebas: si hoy es lunes y no hay datos, usar último dato disponible
-        
-        last_year = today.year - 1
-        start_ly, end_ly = pd.Timestamp(f"{last_year}-01-01"), pd.Timestamp(f"{last_year}-12-31")
-        start_ytd = pd.Timestamp(f"{today.year}-01-01")
-        last_month_start = (today.replace(day=1) - pd.Timedelta(days=1)).replace(day=1)
-
-        rows = []
-        for category, df in data.items():
-            series = df.iloc[:, 0].dropna()
-            if series.empty: continue
-
-            # Función auxiliar para obtener precio más cercano anterior o igual a la fecha
-            def get_price(date):
-                idx = series.index.asof(date)
-                return series.loc[idx] if pd.notnull(idx) else None
-
-            try:
-                # Retorno Año Anterior
-                p0_ly, p1_ly = get_price(start_ly), get_price(end_ly)
-                r_ly = (p1_ly / p0_ly - 1) * 100 if p0_ly and p1_ly else None
+        yahoo_assets = {
+            "Global equities": "SPY",
+            "GEM equities": "EEM",
+            "Global government bonds": "IGLO.L",
+            "Global EM government bonds": "LEMB",
+            "Gold": "GOLD",
+            "Other commodities": "^BCOM",
+            "Real estate": "REET",
+            "Crypto": "BTC-USD"
+        }
+    
+        fred_series = {
+            "Global HY corp bonds": "BAMLH0A0HYM2EY",
+            "Global IG corp bonds": "BAMLC0A0CMEY"
+        }
+    
+        # --- DESCARGA DE DATOS CORREGIDA ---
+        @st.cache_data(ttl=3600) # Caché para no descargar cada vez que muevas algo
+        def get_all_data():
+            data_dict = {}
+            
+            # Yahoo Finance
+            for name, ticker in yahoo_assets.items():
+                try:
+                    # auto_adjust=True y flat_header evitan problemas de formato
+                    df = yf.download(ticker, progress=False, period="max")
+                    if not df.empty:
+                        # Forzamos a que sea una serie simple de precios de cierre
+                        # Usamos .iloc[:, 0] por si yfinance devuelve MultiIndex
+                        series = df['Close'].iloc[:, 0] if isinstance(df['Close'], pd.DataFrame) else df['Close']
+                        data_dict[name] = pd.DataFrame(series).rename(columns={series.name: name})
+                except Exception as e:
+                    st.warning(f"Error con {name}: {e}")
+    
+            # FRED
+            for name, series_id in fred_series.items():
+                try:
+                    s = fred.get_series(series_id)
+                    data_dict[name] = pd.DataFrame(s, columns=[name])
+                except:
+                    pass
+            return data_dict
+    
+        benchmark1 = get_all_data()
+    
+        # --- LÓGICA DE CÁLCULO ---
+        def compute_period_returns(data):
+            today = pd.Timestamp.today().normalize()
+            # Ajuste para pruebas: si hoy es lunes y no hay datos, usar último dato disponible
+            
+            last_year = today.year - 1
+            start_ly, end_ly = pd.Timestamp(f"{last_year}-01-01"), pd.Timestamp(f"{last_year}-12-31")
+            start_ytd = pd.Timestamp(f"{today.year}-01-01")
+            last_month_start = (today.replace(day=1) - pd.Timedelta(days=1)).replace(day=1)
+    
+            rows = []
+            for category, df in data.items():
+                series = df.iloc[:, 0].dropna()
+                if series.empty: continue
+    
+                # Función auxiliar para obtener precio más cercano anterior o igual a la fecha
+                def get_price(date):
+                    idx = series.index.asof(date)
+                    return series.loc[idx] if pd.notnull(idx) else None
+    
+                try:
+                    # Retorno Año Anterior
+                    p0_ly, p1_ly = get_price(start_ly), get_price(end_ly)
+                    r_ly = (p1_ly / p0_ly - 1) * 100 if p0_ly and p1_ly else None
+                    
+                    # Retorno YTD
+                    p0_ytd, p1_now = get_price(start_ytd), series.iloc[-1]
+                    r_ytd = (p1_now / p0_ytd - 1) * 100 if p0_ytd else None
+    
+                    # Retorno Mes Pasado
+                    p0_lm, p1_now2 = get_price(last_month_start), series.iloc[-1]
+                    r_lm = (p1_now2 / p0_lm - 1) * 100 if p0_lm else None
+    
+                    rows.append([category, str(last_year), r_ly])
+                    rows.append([category, "YTD", r_ytd])
+                    rows.append([category, last_month_start.strftime("%b%y"), r_lm])
+                except:
+                    continue
+            return pd.DataFrame(rows, columns=["Category", "Period", "Value"])
+    
+        asset_class1 = compute_period_returns(benchmark1)
+    
+        # --- GRÁFICO ---
+        if not asset_class1.empty:
+            # Ordenar periodos: Año pasado, YTD, Mes actual
+            periods_order = sorted(asset_class1["Period"].unique(), key=lambda x: ("YTD" in x, x.isdigit()))
+            color_map = {periods_order[0]: "black", "YTD": "gray", periods_order[-1]: "red"}
+    
+            fig, ax = plt.subplots(figsize=(14, 6))
+            categories = asset_class1["Category"].unique()
+            x = np.arange(len(categories))
+            width = 0.25
+    
+            for i, p in enumerate(periods_order):
+                subset = asset_class1[asset_class1["Period"] == p]
+                # Asegurar que coincidan con el orden de las categorías
+                vals = [asset_class1[(asset_class1["Category"] == c) & (asset_class1["Period"] == p)]["Value"].values[0] 
+                        if not asset_class1[(asset_class1["Category"] == c) & (asset_class1["Period"] == p)].empty else 0 
+                        for c in categories]
                 
-                # Retorno YTD
-                p0_ytd, p1_now = get_price(start_ytd), series.iloc[-1]
-                r_ytd = (p1_now / p0_ytd - 1) * 100 if p0_ytd else None
-
-                # Retorno Mes Pasado
-                p0_lm, p1_now2 = get_price(last_month_start), series.iloc[-1]
-                r_lm = (p1_now2 / p0_lm - 1) * 100 if p0_lm else None
-
-                rows.append([category, str(last_year), r_ly])
-                rows.append([category, "YTD", r_ytd])
-                rows.append([category, last_month_start.strftime("%b%y"), r_lm])
-            except:
-                continue
-        return pd.DataFrame(rows, columns=["Category", "Period", "Value"])
-
-    asset_class1 = compute_period_returns(benchmark1)
-
-    # --- GRÁFICO ---
-    if not asset_class1.empty:
-        # Ordenar periodos: Año pasado, YTD, Mes actual
-        periods_order = sorted(asset_class1["Period"].unique(), key=lambda x: ("YTD" in x, x.isdigit()))
-        color_map = {periods_order[0]: "black", "YTD": "gray", periods_order[-1]: "red"}
-
-        fig, ax = plt.subplots(figsize=(14, 6))
-        categories = asset_class1["Category"].unique()
-        x = np.arange(len(categories))
-        width = 0.25
-
-        for i, p in enumerate(periods_order):
-            subset = asset_class1[asset_class1["Period"] == p]
-            # Asegurar que coincidan con el orden de las categorías
-            vals = [asset_class1[(asset_class1["Category"] == c) & (asset_class1["Period"] == p)]["Value"].values[0] 
-                    if not asset_class1[(asset_class1["Category"] == c) & (asset_class1["Period"] == p)].empty else 0 
-                    for c in categories]
+                rects = ax.bar(x + (i - 1) * width, vals, width, label=p, color=color_map.get(p, "blue"))
+                
+                # Etiquetas de datos
+                for rect in rects:
+                    h = rect.get_height()
+                    ax.annotate(f'{h:.1f}', xy=(rect.get_x() + rect.get_width()/2, h),
+                                xytext=(0, 3 if h >= 0 else -12), textcoords="offset points",
+                                ha='center', va='bottom' if h >= 0 else 'top', fontsize=8)
+    
+            ax.axhline(0, color='black', linewidth=0.8)
+            ax.set_xticks(x)
+            ax.set_xticklabels([textwrap.fill(c, 12) for c in categories], fontsize=9)
+            ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.15), ncol=3, frameon=False)
+            plt.tight_layout()
             
-            rects = ax.bar(x + (i - 1) * width, vals, width, label=p, color=color_map.get(p, "blue"))
-            
-            # Etiquetas de datos
-            for rect in rects:
-                h = rect.get_height()
-                ax.annotate(f'{h:.1f}', xy=(rect.get_x() + rect.get_width()/2, h),
-                            xytext=(0, 3 if h >= 0 else -12), textcoords="offset points",
-                            ha='center', va='bottom' if h >= 0 else 'top', fontsize=8)
-
-        ax.axhline(0, color='black', linewidth=0.8)
-        ax.set_xticks(x)
-        ax.set_xticklabels([textwrap.fill(c, 12) for c in categories], fontsize=9)
-        ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.15), ncol=3, frameon=False)
-        plt.tight_layout()
-        
-        st.pyplot(fig)
-    else:
-        st.error("No se pudieron procesar los datos. Verifica la conexión o las APIs.")    
+            st.pyplot(fig)
+        else:
+            st.error("No se pudieron procesar los datos. Verifica la conexión o las APIs.")    
     
     
     
