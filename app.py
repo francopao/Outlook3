@@ -19,6 +19,7 @@ from io import StringIO
 # --------------------------------------
 fred = Fred(api_key='762e2ee1c8fab5d038ce317929d47226')
 @st.cache_data
+
 def obtener_datos_tesoro(periodos):
     all_data = []
 
@@ -39,12 +40,13 @@ def obtener_datos_tesoro(periodos):
             continue
 
         try:
-            df_year = pd.read_html(StringIO(response.text),flavor="bs4")[0]
-
+            df_year = pd.read_html(
+                StringIO(response.text),
+                flavor="bs4"
+            )[0]
         except ValueError:
             continue
 
-        # Limpieza estándar
         df_year.columns = df_year.columns.str.strip()
         df_year["Date"] = pd.to_datetime(df_year["Date"])
         df_year["Year"] = year
@@ -56,7 +58,6 @@ def obtener_datos_tesoro(periodos):
 
     df = pd.concat(all_data, ignore_index=True)
 
-    # Mantener tu lógica original
     df = df.drop(columns=["1.5 Mo"], errors="ignore")
     df = df.replace("N/A", pd.NA)
     df = df.dropna(axis=1, how="all")
