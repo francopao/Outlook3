@@ -20,63 +20,31 @@ from io import StringIO
 fred = Fred(api_key='762e2ee1c8fab5d038ce317929d47226')
 st.cache_data.clear()
 
+import pandas as pd
+
 def obtener_datos_tesoro(periodos):
-    all_data = []
+    url = (
+        "https://home.treasury.gov/resource-center/data-chart-center/"
+        "interest-rates/daily-treasury-rates.csv"
+    )
 
-    headers_req = {
-        "User-Agent": "Mozilla/5.0"
-    }
+    df = pd.read_csv(url)
 
-    for year in periodos:
-        url = (
-            "https://home.treasury.gov/resource-center/data-chart-center/"
-            "interest-rates/TextView"
-            f"?type=daily_treasury_yield_curve&field_tdr_date_value={year}"
-        )
+    # Normalizar nombres
+    df.columns = df.columns.str.strip()
+    df["Date"] = pd.to_datetime(df["Date"])
 
-        response = requests.get(url, headers=headers_req, timeout=30)
+    # Filtrar años
+    df = df[df["Date"].dt.year.isin(periodos)]
 
-        if response.status_code != 200:
-            continue
-
-        soup = BeautifulSoup(response.text, "html.parser")
-
-        table = soup.find("table", id="DataTables_Table_0")
-        if table is None:
-            continue
-
-        # Headers
-        headers = [th.get_text(strip=True) for th in table.find("thead").find_all("th")]
-
-        # Filas
-        rows = []
-        for tr in table.find("tbody").find_all("tr"):
-            rows.append([td.get_text(strip=True) for td in tr.find_all("td")])
-
-        if not rows:
-            continue
-
-        df_year = pd.DataFrame(rows, columns=headers)
-
-        # Tipos y limpieza
-        df_year["Date"] = pd.to_datetime(df_year["Date"], errors="coerce")
-        df_year["Year"] = year
-
-        all_data.append(df_year)
-
-    if not all_data:
-        return pd.DataFrame()
-
-    df = pd.concat(all_data, ignore_index=True)
-
-    # Mantener tu lógica original
+    # Mantener tu lógica
     df = df.drop(columns=["1.5 Mo"], errors="ignore")
     df = df.replace("N/A", pd.NA)
     df = df.dropna(axis=1, how="all")
     df = df.fillna(0)
 
     for col in df.columns:
-        if col not in ["Date", "Year"]:
+        if col != "Date":
             df[col] = pd.to_numeric(df[col], errors="coerce")
 
     df = df.sort_values("Date").reset_index(drop=True)
