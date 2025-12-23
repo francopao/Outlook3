@@ -306,7 +306,7 @@ tab1, tab2, tab3, tab4 = st.tabs(["Treasury Yields", "US Corporate Bonds", "US L
 # --------------------------------------    
 with tab1:
     años = st.multiselect("Selecciona año(s):", list(range(2006, 2026)), default=[2025])
-    df = obtener_datos_tesoro(años)
+    df = load_treasury_from_excel(años)
 
     if not df.empty:
         st.success(f"{df.shape[0]} registros obtenidos.")
