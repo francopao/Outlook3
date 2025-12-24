@@ -613,6 +613,7 @@ with tab4:
     except AttributeError:
         # ai usas "from datetime import datetime"
         current_date = datetime.now()
+    current_year = current_date.year
     prev_year = current_year - 1
     
     periodo = st.selectbox(
