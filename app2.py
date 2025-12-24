@@ -426,42 +426,43 @@ with tab1:
 with tab2:
     st.header("Análisis de Tasas y Expectativas de Inflación (FRED)")
     
-    # 1) Conexión a FRED (Podemos reutilizar la lógica de descarga directa aquí)
+    # 1) Conexión y Configuración
     api_key = "762e2ee1c8fab5d038ce317929d47226"
     fred = Fred(api_key=api_key)
     start_date = "2021-01-01"
 
-    with st.spinner("Descargando series macroeconómicas..."):
+    # Uso de spinner para feedback visual
+    with st.spinner("Descargando datos macroeconómicos de la FRED..."):
         try:
-            # Descarga de series
+            # Descarga de series directamente
             dgs10  = fred.get_series('DGS10',  observation_start=start_date)  # Nominal 10Y
             dfii10 = fred.get_series('DFII10', observation_start=start_date)  # Real 10Y (TIPS)
             t10yie = fred.get_series('T10YIE', observation_start=start_date)  # Breakeven 10Y
             effr   = fred.get_series('EFFR',   observation_start=start_date)  # Fed Funds Rate
 
-            # Unir en DataFrame
+            # Unir en DataFrame y limpiar
             df_macro = pd.concat([dgs10, dfii10, t10yie, effr], axis=1)
             df_macro.columns = ['DGS10', 'DFII10', 'T10YIE', 'EFFR']
             df_macro = df_macro.dropna()
 
-            # 2) Crear gráfico de Plotly
+            # 2) Construcción del gráfico Plotly
             fig_macro = go.Figure()
 
-            # Nominal 10Y
+            # Serie Nominal 10Y
             fig_macro.add_trace(go.Scatter(
                 x=df_macro.index, y=df_macro['DGS10'],
                 mode='lines', name='Nominal 10Y (DGS10)',
                 line=dict(color='blue', width=2)
             ))
 
-            # Breakeven 10Y
+            # Serie Breakeven 10Y
             fig_macro.add_trace(go.Scatter(
                 x=df_macro.index, y=df_macro['T10YIE'],
                 mode='lines', name='Breakeven 10Y (T10YIE)',
                 line=dict(color='orange', width=2)
             ))
 
-            # Real 10Y (Área sombreada)
+            # Serie Real 10Y (Sombreado)
             fig_macro.add_trace(go.Scatter(
                 x=df_macro.index, y=df_macro['DFII10'],
                 mode='lines', name='Real 10Y (DFII10)',
@@ -469,47 +470,46 @@ with tab2:
                 fill='tozeroy', fillcolor='rgba(128, 128, 128, 0.15)'
             ))
 
-            # Fed Funds Rate (Eje secundario)
+            # Serie Fed Funds Rate (Eje Y Secundario)
             fig_macro.add_trace(go.Scatter(
                 x=df_macro.index, y=df_macro['EFFR'],
                 mode='lines', name='Fed Funds Rate (EFFR)',
                 line=dict(color='#B91C1C', width=1, dash='dash'),
-                opacity=0.9, yaxis='y2'
+                opacity=0.8, yaxis='y2'
             ))
 
-            # 3) Eventos macro
+            # 3) Marcadores de Eventos (Corregido el error de datetime)
+            # Usamos datetime.date o datetime.datetime dependiendo de la importación
             events = [
                 (datetime.datetime(2022, 3, 16), "Fed hike Mar 2022"),
                 (datetime.datetime(2022, 6, 13), "US CPI peak Jun 2022"),
                 (datetime.datetime(2022, 2, 24), "War in Ukraine Feb 2022")
             ]
 
-            for date_ev, label in events:
-                # Encontrar la fecha más cercana disponible en el índice
-                if date_ev in df_macro.index:
-                    nearest_date = date_ev
-                else:
-                    pos = df_macro.index.searchsorted(date_ev)
-                    nearest_date = df_macro.index[min(pos, len(df_macro.index) - 1)]
+            for ev_date, label in events:
+                # Buscar la fecha más cercana en el índice para posicionar el punto
+                idx_pos = df_macro.index.searchsorted(ev_date)
+                if idx_pos < len(df_macro.index):
+                    actual_date = df_macro.index[idx_pos]
+                    fig_macro.add_trace(go.Scatter(
+                        x=[actual_date],
+                        y=[df_macro.loc[actual_date, 'DGS10']],
+                        mode='markers',
+                        marker=dict(color='red', size=10, symbol='circle'),
+                        text=[label],
+                        hoverinfo="text",
+                        showlegend=False
+                    ))
 
-                fig_macro.add_trace(go.Scatter(
-                    x=[nearest_date],
-                    y=[df_macro.loc[nearest_date, 'DGS10']],
-                    mode='markers',
-                    marker=dict(color='red', size=10, symbol='circle'),
-                    text=[label],
-                    hoverinfo="text",
-                    showlegend=False
-                ))
-
-            # 4) Configuración del layout
+            # 4) Layout Profesional
             fig_macro.update_layout(
                 title="Nominal vs Breakeven vs Real Yield (10Y)",
                 xaxis_title="Fecha",
                 yaxis_title="Yield (%)",
                 hovermode="x unified",
-                legend=dict(orientation="h", y=-0.2, x=0.5, xanchor="center"),
+                template="plotly_white",
                 height=600,
+                legend=dict(orientation="h", y=-0.2, x=0.5, xanchor="center"),
                 yaxis2=dict(
                     title="Fed Funds Rate (%)",
                     overlaying='y',
@@ -518,17 +518,19 @@ with tab2:
                 )
             )
 
-            # Mostrar en Streamlit
+            # Renderizar gráfico
             st.plotly_chart(fig_macro, use_container_width=True)
 
-            # Opcional: Mostrar los últimos valores en métricas
-            col1, col2, col3 = st.columns(3)
-            col1.metric("Nominal 10Y", f"{df_macro['DGS10'].iloc[-1]}%")
-            col2.metric("Breakeven 10Y", f"{df_macro['T10YIE'].iloc[-1]}%")
-            col3.metric("Real 10Y", f"{df_macro['DFII10'].iloc[-1]}%")
+            # 5) Resumen de valores actuales
+            st.subheader("Valores de Cierre Actuales")
+            c1, c2, c3, c4 = st.columns(4)
+            c1.metric("Nominal 10Y", f"{df_macro['DGS10'].iloc[-1]:.2f}%")
+            c2.metric("Real 10Y", f"{df_macro['DFII10'].iloc[-1]:.2f}%")
+            c3.metric("Breakeven 10Y", f"{df_macro['T10YIE'].iloc[-1]:.2f}%")
+            c4.metric("Fed Funds", f"{df_macro['EFFR'].iloc[-1]:.2f}%")
 
         except Exception as e:
-            st.error(f"Error al cargar datos de FRED: {e}")
+            st.error(f"Error al procesar los datos de FRED: {e}")
 
 
 
