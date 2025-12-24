@@ -15,6 +15,7 @@ import textwrap
 from dateutil.relativedelta import relativedelta
 import yfinance as yf
 from io import StringIO
+import datetime
 # --------------------------------------
 # SCRAPER Y TRANSFORMADOR DE DATOS
 # --------------------------------------
