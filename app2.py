@@ -901,7 +901,7 @@ with st.spinner("Descargando balances de distritos FED..."):
         ))
 
         fig_rating.update_layout(
-            title="S&P Global Sovereign Ratings Hierarchy",
+            title="S&P Global Sovereign Ratings",
             xaxis=dict(
                 title="",             # Eliminamos el título del eje X
                 showgrid=False,       # Opcional: limpiar cuadrícula para estética minimalista
