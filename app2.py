@@ -719,8 +719,7 @@ with st.spinner("Descargando balances de distritos FED..."):
     st.subheader("Análisis Detallado del Balance de la FED (H.4.1)")
 
     # 1) Configuración de Series y Estructura
-    api_key = "762e2ee1c8fab5d038ce317929d47226"
-    fred = Fred(api_key=api_key)
+    # fred = Fred(api_key=api_key)
 
     # Definición de la estructura basada en tus imágenes
     # Formato: {Nombre Visual: Serie FRED}
