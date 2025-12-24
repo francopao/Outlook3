@@ -716,13 +716,10 @@ with st.spinner("Descargando balances de distritos FED..."):
 
 
     st.markdown("---")
-    st.subheader("Análisis Detallado del Balance de la FED (H.4.1)")
+    st.subheader("FED H.4.1: Factors Affecting Reserve Balances")
 
-    # 1) Configuración de Series y Estructura
-    # fred = Fred(api_key=api_key)
 
-    # Definición de la estructura basada en tus imágenes
-    # Formato: {Nombre Visual: Serie FRED}
+    # 1) Mapeo Exacto de Series
     assets_map = {
         "Total Assets": "WALCL",
         "Gold certificate account": "WGCAL",
@@ -738,7 +735,7 @@ with st.spinner("Descargando balances de distritos FED..."):
         "Unamortized discounts on securities held outright": "WUDSHO",
         "Repurchase agreements": "WORAL",
         "Loans": "WLCFLL",
-        "Net portfolio holdings of MS Facilities LLC": "H41RESPAAENWW",
+        "Net portfolio holdings of MS Facilities LLC": "H41RESPPAAENWW",
         "Items in process of collection": "WPCLC",
         "Bank premises": "SWPT",
         "Central bank liquidity swaps": "WABPL",
@@ -750,102 +747,102 @@ with st.spinner("Descargando balances de distritos FED..."):
         "Total Liabilities": "WLTLECL",
         "Federal Reserve Notes, net of F.R. Bank holdings": "WLFN",
         "Reverse repurchase agreements": "WLRRAL",
-        "Deposits": "WLDLC",
+        "Deposits": "WLDLCL",
         "Treasury contributions to credit facilities": "H41RESH4ENWW",
         "Deferred availability cash items": "WLDACLC",
         "Other Liabilities and Accrued Dividends": "WLAD"
     }
 
     @st.cache_data(ttl=3600)
-    def get_fed_table_data():
-        all_series = list(assets_map.values()) + list(liabilities_map.values())
-        df_list = []
-        
-        # Descargamos data histórica suficiente
-        for serie in all_series:
-            data = fred.get_series(serie)
-            data.name = serie
-            df_list.append(data)
-        
-        df_master = pd.concat(df_list, axis=1).ffill()
-        return df_master
+    def get_fed_balance_data():
+        all_ids = list(assets_map.values()) + list(liabilities_map.values())
+        data_frames = []
+        for s_id in all_ids:
+            try:
+                s = fred.get_series(s_id, observation_start='2008-01-01')
+                s.name = s_id
+                data_frames.append(s)
+            except: continue
+        return pd.concat(data_frames, axis=1).ffill()
 
     try:
-        df_raw = get_fed_table_data()
+        df_raw = get_fed_balance_data()
         
-        # 2) Definición de Fechas Clave
-        last_date = df_raw.index[-1]
-        prev_week = df_raw.index[-2]
-        year_ago_target = last_date - timedelta(days=365)
-        year_ago_date = df_raw.index[df_raw.index.searchsorted(year_ago_target) - 1]
+        # Referencias Temporales sin usar timedelta
+        # Para frecuencia semanal, 'Year Ago' son aproximadamente 52 periodos atrás
+        idx_last = -1
+        idx_prev = -2
+        idx_ya = -53 # 52 semanas en un año + 1 para cuadrar la misma semana
         
-        # Fechas fijas solicitadas
-        march_2020_end = datetime(2020, 3, 25) # Última semana Marzo 2020
-        march_2020_prev = datetime(2020, 3, 18)
-        october_2008_start = datetime(2008, 10, 8) # Primera semana Octubre 2008
-        october_2008_prev = datetime(2008, 10, 1)
+        # Hitos específicos usando pd.Timestamp (nativo de pandas, no requiere timedelta)
+        m20_dt = pd.Timestamp('2020-03-25')
+        m20_prev = pd.Timestamp('2020-03-18')
+        o08_dt = pd.Timestamp('2008-10-08')
+        o08_prev = pd.Timestamp('2008-10-01')
 
-        # 3) Cálculo de Columnas
-        rows = []
-        
-        def process_group(mapping, group_name):
-            total_serie = mapping[group_name]
-            total_val = df_raw[total_serie].iloc[-1]
-            
-            for label, serie in mapping.items():
+        def build_rows(mapping, total_id):
+            total_val = df_raw[total_id].iloc[idx_last]
+            rows = []
+            for name, s_id in mapping.items():
+                if s_id not in df_raw.columns: continue
+                
                 # Valores nominales
-                current = df_raw[serie].iloc[-1]
-                prev = df_raw[serie].loc[prev_week]
+                val = df_raw[s_id].iloc[idx_last]
+                val_prev = df_raw[s_id].iloc[idx_prev]
+                
+                # Manejo de Year Ago por posición de índice para evitar timedelta
+                try:
+                    val_ya = df_raw[s_id].iloc[idx_ya]
+                except IndexError:
+                    val_ya = df_raw[s_id].iloc[0]
                 
                 # Variaciones
-                var_1w = ((current / prev) - 1) * 100
-                var_year = ((current / df_raw[serie].loc[year_ago_date]) - 1) * 100
+                v_1w = ((val / val_prev) - 1) * 100 if val_prev != 0 else 0
+                v_ya = ((val / val_ya) - 1) * 100 if val_ya != 0 else 0
                 
-                # Variaciones históricas específicas
+                # Hitos históricos
                 try:
-                    var_mar20 = ((df_raw[serie].asof(march_2020_end) / df_raw[serie].asof(march_2020_prev)) - 1) * 100
-                    var_oct08 = ((df_raw[serie].asof(october_2008_start) / df_raw[serie].asof(october_2008_prev)) - 1) * 100
-                except:
-                    var_mar20, var_oct08 = 0, 0
-
-                # Contribución a la cuenta (Weight)
-                weight = (current / total_val) * 100
+                    v_m20 = ((df_raw[s_id].asof(m20_dt) / df_raw[s_id].asof(m20_prev)) - 1) * 100
+                except: v_m20 = 0
+                try:
+                    v_o08 = ((df_raw[s_id].asof(o08_dt) / df_raw[s_id].asof(o08_prev)) - 1) * 100
+                except: v_o08 = 0
 
                 rows.append({
-                    "Fed Account": label,
-                    "Last Value (Nominal)": current,
-                    "Weight (%)": weight,
-                    "Var% 1 Week": var_1w,
-                    "Year Ago": var_year,
-                    "March 2020": var_mar20,
-                    "October 2008": var_oct08
+                    "Fed Account": name,
+                    "Last Value": val,
+                    "Weight (%)": (val / total_val) * 100,
+                    "Var% 1 Week": v_1w,
+                    "Year Ago": v_ya,
+                    "March 2020": v_m20,
+                    "October 2008": v_o08
                 })
+            return rows
 
-        process_group(assets_map, "Total Assets")
-        process_group(liabilities_map, "Total Liabilities")
-        
-        df_final = pd.DataFrame(rows)
+        all_data = build_rows(assets_map, "WALCL") + build_rows(liabilities_map, "WLTLECL")
+        df_final = pd.DataFrame(all_data)
 
-        # 4) Visualización Estética
-        def color_variation(val):
-            color = 'red' if val < 0 else 'green'
-            return f'color: {color}'
+        # Estilo visual
+        def color_map(v):
+            if isinstance(v, (int, float)):
+                return f'color: {"#00A86B" if v > 0 else "#DE3163" if v < 0 else "gray"}; font-weight: bold'
+            return ''
 
         st.dataframe(
             df_final.style.format({
-                "Last Value (Nominal)": "{:,.2f}",
+                "Last Value": "{:,.0f}",
                 "Weight (%)": "{:.2f}%",
                 "Var% 1 Week": "{:+.2f}%",
                 "Year Ago": "{:+.2f}%",
                 "March 2020": "{:+.2f}%",
                 "October 2008": "{:+.2f}%"
-            }).map(color_variation, subset=["Var% 1 Week", "Year Ago", "March 2020", "October 2008"]),
-            height=800,
-            use_container_width=True
+            }).map(color_map, subset=["Var% 1 Week", "Year Ago", "March 2020", "October 2008"]),
+            use_container_width=True,
+            height=850
         )
 
     except Exception as e:
-        st.error(f"Error generando la tabla FED: {e}")
+        st.error(f"Error en la tabla: {e}")
 
 
 
