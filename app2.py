@@ -632,6 +632,7 @@ with tab2:
             st.error(f"Error al procesar datos de crédito: {e}")
 
 # --- Nuevo Bloque: Activos y Pasivos por Distrito FED ---
+# --- Nuevo Bloque: Activos y Pasivos por Distrito FED ---
 st.markdown("---")
 st.subheader("FED Assets & Liabilities by District")
 
@@ -647,25 +648,29 @@ with st.spinner("Descargando balances de distritos FED..."):
         assets_series = [f"D{i}WATAL" for i in range(1, 13)]
         liab_series = [f"D{i}WLTOTL" for i in range(1, 13)]
 
-        # Descargar el último dato disponible para cada serie
         assets_data = []
         liab_data = []
 
         for a_id, l_id in zip(assets_series, liab_series):
-            # Obtenemos solo el valor más reciente
+            # Obtenemos el último dato y aseguramos que sea float
             a_val = fred.get_series(a_id).iloc[-1]
             l_val = fred.get_series(l_id).iloc[-1]
             assets_data.append(a_val)
             liab_data.append(l_val)
 
-        # Crear DataFrame para el gráfico
+        # Crear DataFrame
         df_fed = pd.DataFrame({
             'Distrito': distritos,
             'Assets': assets_data,
             'Liabilities': liab_data
         })
 
-        # Construcción del gráfico de barras horizontales
+        # SOLUCIÓN AL ERROR: Convertir columnas a numérico explícitamente
+        df_fed['Assets'] = pd.to_numeric(df_fed['Assets'], errors='coerce')
+        df_fed['Liabilities'] = pd.to_numeric(df_fed['Liabilities'], errors='coerce')
+        df_fed = df_fed.fillna(0) # Reemplazar nulos por 0 para que no falle el formato
+
+        # Construcción del gráfico
         fig_fed = go.Figure()
 
         fig_fed.add_trace(go.Bar(
@@ -684,11 +689,10 @@ with st.spinner("Descargando balances de distritos FED..."):
             marker=dict(color='#DC2626')
         ))
 
-        # Ajustes de Layout
         fig_fed.update_layout(
             title="Federal Reserve Banks: Total Assets vs Liabilities by District",
             xaxis_title="Millions of US Dollars",
-            yaxis=dict(autorange="reversed"), # Para que Boston aparezca arriba
+            yaxis=dict(autorange="reversed"),
             barmode='group',
             template="plotly_white",
             height=700,
@@ -698,9 +702,13 @@ with st.spinner("Descargando balances de distritos FED..."):
 
         st.plotly_chart(fig_fed, use_container_width=True)
 
-        # Mostrar tabla resumen expandible
+        # Mostrar tabla resumen con el formato corregido
         with st.expander("Ver tabla de datos (Millones USD)"):
-            st.dataframe(df_fed.style.format("{:,.2f}"))
+            # Aplicamos el formato solo a las columnas numéricas
+            st.dataframe(df_fed.style.format({
+                'Assets': '{:,.2f}',
+                'Liabilities': '{:,.2f}'
+            }))
 
     except Exception as e:
         st.error(f"Error al cargar los balances de la FED: {e}")
