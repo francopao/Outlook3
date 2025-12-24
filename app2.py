@@ -539,6 +539,97 @@ with tab2:
         except Exception as e:
             st.error(f"Error al procesar los datos de FRED: {e}")
 
+    start_date = "2021-01-01"
+
+    with st.spinner("Descargando rendimientos corporativos..."):
+        try:
+            # Diccionario para mantener el orden de la leyenda solicitado
+            series_dict = {
+                'BAMLC0A1CAAAEY': 'AAA',
+                'BAMLC0A2CAAEY': 'AA',
+                'BAMLC0A3CAEY': 'A',
+                'BAMLC0A4CBBBEY': 'BBB',
+                'BAMLH0A1HYBBEY': 'BB',
+                'BAMLH0A2HYBEY': 'B',
+                'BAMLH0A3HYCEY': 'CCC'
+            }
+
+            # Descarga de series corporativas
+            data_list = []
+            for id_serie, nombre in series_dict.items():
+                s = fred.get_series(id_serie, observation_start=start_date)
+                s.name = nombre
+                data_list.append(s)
+            
+            # Descarga del DGS10 (Benchmark)
+            dgs10 = fred.get_series('DGS10', observation_start=start_date)
+            dgs10.name = 'DGS10'
+            data_list.append(dgs10)
+
+            # Unir y limpiar
+            df_credit = pd.concat(data_list, axis=1)
+            df_credit = df_credit.dropna()
+
+            # 2) Construcción del gráfico Plotly
+            fig_credit = go.Figure()
+
+            # --- DGS10: Área sombreada sin líneas (Fondo) ---
+            fig_credit.add_trace(go.Scatter(
+                x=df_credit.index, 
+                y=df_credit['DGS10'],
+                mode='lines',
+                line=dict(width=0), # Sin línea
+                fill='tozeroy',
+                fillcolor='rgba(200, 200, 200, 0.3)', # Gris suave
+                name='Treasury 10Y (DGS10)',
+                hoverinfo='skip' # No distrae en el hover
+            ))
+
+            # --- Series Corporativas (Líneas protagonistas) ---
+            # Colores en escala de riesgo (de azul frío a rojo caliente)
+            colors = {
+                'AAA': '#1E3A8A', 'AA': '#2563EB', 'A': '#60A5FA', 
+                'BBB': '#F59E0B', 'BB': '#EA580C', 'B': '#DC2626', 'CCC': '#7F1D1D'
+            }
+
+            for rating in series_dict.values():
+                fig_credit.add_trace(go.Scatter(
+                    x=df_credit.index,
+                    y=df_credit[rating],
+                    mode='lines',
+                    name=rating,
+                    line=dict(color=colors.get(rating), width=2)
+                ))
+
+            # 3) Layout Profesional
+            fig_credit.update_layout(
+                title="Corporate Bond Yields by Credit Rating vs Treasury 10Y",
+                xaxis_title="Fecha",
+                yaxis_title="Yield (%)",
+                hovermode="x unified",
+                template="plotly_white",
+                height=650,
+                legend=dict(
+                    orientation="h", 
+                    y=-0.15, 
+                    x=0.5, 
+                    xanchor="center",
+                    traceorder="normal" # Mantiene el orden en que fueron añadidos
+                ),
+                margin=dict(l=20, r=20, t=60, b=100)
+            )
+
+            # Renderizar gráfico
+            st.plotly_chart(fig_credit, use_container_width=True)
+
+            # 4) Métricas Rápidas (Último valor)
+            st.subheader("Current Yields (Latest)")
+            cols = st.columns(len(series_dict))
+            for i, rating in enumerate(series_dict.values()):
+                cols[i].metric(rating, f"{df_credit[rating].iloc[-1]:.2f}%")
+
+        except Exception as e:
+            st.error(f"Error al procesar datos de crédito: {e}")
 
 
 
