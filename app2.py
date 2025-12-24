@@ -286,7 +286,7 @@ def compute_period_returns_alt(benchmark1):
 # --------------------------------------
 
 st.set_page_config(layout="wide")
-st.image("https://media.licdn.com/dms/image/v2/D4E03AQHNhGZoA9sCQA/profile-displayphoto-shrink_200_200/B4EZahq4dLGQAg-/0/1746469097627?e=2147483647&v=beta&t=hAA0K9UwE_sigpOhx5y4U4soabNV6x8H8O-VZBDvhbM", 
+st.image("https://media.licdn.com/dms/image/v2/D4D03AQFPldTT75xHfA/profile-displayphoto-scale_200_200/B4DZsPFlJ2LUAc-/0/1765484680480?e=1768435200&v=beta&t=e_s3qJ-SEoYzKk-5YYe7raLSnmd70XJuIFUGU_j7YoY", 
          width=200)
 st.title("Global Fixed Income Dashboard - Franco Olivares")
 
@@ -294,8 +294,16 @@ tab1, tab2, tab3, tab4 = st.tabs(["Treasury Yields", "US Corporate Bonds", "US L
 
 # --------------------------------------
 # TAB 1: CURVAS DEL TESORO
-# --------------------------------------    
+# --------------------------------------
 with tab1:
+
+    st.image(
+        "https://images.pexels.com/photos/12422182/pexels-photo-12422182.jpeg",
+        use_container_width=True
+    )
+
+    st.markdown("### Treasury Yield Curves")
+
     # -------------------------------
     # CARGA DIRECTA DEL EXCEL
     # -------------------------------
