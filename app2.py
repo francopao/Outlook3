@@ -1,5 +1,4 @@
 import streamlit as st
-st.write("ARCHIVO ACTUAL — VERSION NUEVA")
 import pandas as pd
 import requests
 from bs4 import BeautifulSoup
@@ -928,6 +927,175 @@ with st.spinner("Descargando balances de distritos FED..."):
         st.error("No se pudo conectar con la fuente de datos.")
 
 
+
+
+
+
+with tab3:
+    st.subheader("Labor Market: Initial vs. Continued Claims")
+    
+    api_key = "762e2ee1c8fab5d038ce317929d47226"
+    fred = Fred(api_key=api_key)
+
+    @st.cache_data(ttl=3600)
+    def get_claims_data():
+        # ICSA: Initial Claims (Semanal)
+        # CCSA: Continued Claims (Semanal)
+        icsa = fred.get_series('ICSA', observation_start='2019-01-01')
+        ccsa = fred.get_series('CCSA', observation_start='2019-01-01')
+        
+        df = pd.DataFrame({'Initial Claims': icsa, 'Continued Claims': ccsa})
+        return df.ffill()
+
+    try:
+        df_claims = get_claims_data()
+
+        # Crear figura con eje secundario
+        fig_claims = go.Figure()
+
+        # Línea para Continued Claims (Eje Principal - Izquierda)
+        fig_claims.add_trace(go.Scatter(
+            x=df_claims.index,
+            y=df_claims['Continued Claims'],
+            name="Continued Claims (CCSA)",
+            line=dict(color='#1f77b4', width=2),
+            fill='tozeroy', # Relleno para dar sensación de volumen
+            fillcolor='rgba(31, 119, 180, 0.1)'
+        ))
+
+        # Línea para Initial Claims (Eje Secundario - Derecha)
+        fig_claims.add_trace(go.Scatter(
+            x=df_claims.index,
+            y=df_claims['Initial Claims'],
+            name="Initial Claims (ICSA)",
+            line=dict(color='#d62728', width=2.5),
+            yaxis="y2"
+        ))
+
+        # Configuración del Layout
+        fig_claims.update_layout(
+            title="US Weekly Jobless Claims: Initial vs Continued",
+            hovermode="x unified",
+            template="plotly_white",
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+            xaxis=dict(title="Date"),
+            yaxis=dict(
+                title="Continued Claims (Millions)",
+                titlefont=dict(color="#1f77b4"),
+                tickfont=dict(color="#1f77b4")
+            ),
+            yaxis2=dict(
+                title="Initial Claims (Thousands)",
+                titlefont=dict(color="#d62728"),
+                tickfont=dict(color="#d62728"),
+                anchor="x",
+                overlaying="y",
+                side="right"
+            ),
+            height=600
+        )
+
+        st.plotly_chart(fig_claims, use_container_width=True)
+
+        # Métricas rápidas debajo del gráfico
+        last_icsa = df_claims['Initial Claims'].iloc[-1]
+        last_ccsa = df_claims['Continued Claims'].iloc[-1]
+        prev_icsa = df_claims['Initial Claims'].iloc[-2]
+        
+        col1, col2 = st.columns(2)
+        col1.metric("Latest Initial Claims", f"{last_icsa:,.0f}", f"{last_icsa - prev_icsa:,.0f}")
+        col2.metric("Latest Continued Claims", f"{last_ccsa:,.0f}")
+
+    except Exception as e:
+        st.error(f"Error al cargar datos de Claims: {e}")
+
+
+    st.markdown("---")
+    st.subheader("Labor Market: Unemployment Rate by Ethnicity")
+    
+    api_key = "762e2ee1c8fab5d038ce317929d47226"
+    fred = Fred(api_key=api_key)
+
+    @st.cache_data(ttl=3600)
+    def get_unemployment_data():
+        # Mapeo de series solicitadas
+        series_map = {
+            'LNS14000000': 'Total',
+            'LNS14000009': 'Latino',
+            'LNS14000003': 'White',
+            'LNS14032183': 'Asian',
+            'LNS14000006': 'Black'
+        }
+        
+        df_list = []
+        for s_id, label in series_map.items():
+            s = fred.get_series(s_id, observation_start='2005-01-01')
+            s.name = label
+            df_list.append(s)
+            
+        return pd.concat(df_list, axis=1).ffill()
+
+    try:
+        df_unemp = get_unemployment_data()
+
+        fig_unemp = go.Figure()
+
+        # Colores específicos para cada grupo
+        colors = {
+            'Total': 'black',
+            'Black': '#d62728', # Rojo (históricamente más alta)
+            'Latino': '#ff7f0e', # Naranja
+            'Asian': '#2ca02c', # Verde (históricamente más baja)
+            'White': '#1f77b4'  # Azul
+        }
+
+        for col in df_unemp.columns:
+            is_total = (col == 'Total')
+            fig_unemp.add_trace(go.Scatter(
+                x=df_unemp.index,
+                y=df_unemp[col],
+                name=col,
+                line=dict(
+                    color=colors.get(col, 'gray'),
+                    width=4 if is_total else 2, # Resaltar la tasa total
+                    dash='dash' if is_total else 'solid'
+                ),
+                hovertemplate=f"<b>{col}</b>: %{{y:.1f}}%<extra></extra>"
+            ))
+
+        # Configuración del Layout
+        fig_unemp.update_layout(
+            title="Unemployment Rate: Racial and Ethnic Disparities",
+            xaxis_title="Year",
+            yaxis_title="Unemployment Rate (%)",
+            hovermode="x unified",
+            template="plotly_white",
+            height=600,
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5),
+            yaxis=dict(ticksuffix="%")
+        )
+
+        # Añadir sombreado para las recesiones (Opcional pero recomendado)
+        # Recesión 2008 y 2020
+        recessions = [
+            ('2007-12-01', '2009-06-01'),
+            ('2020-02-01', '2020-04-01')
+        ]
+        for start, end in recessions:
+            fig_unemp.add_vrect(
+                x0=start, x1=end, 
+                fillcolor="gray", opacity=0.1, 
+                layer="below", line_width=0
+            )
+
+        st.plotly_chart(fig_unemp, use_container_width=True)
+
+        # Resumen informativo
+        latest_data = df_unemp.iloc[-1].sort_values(ascending=False)
+        st.info(f"**Current Status:** The highest unemployment rate is among **{latest_data.index[0]}** ({latest_data.iloc[0]}%), while the lowest is among **{latest_data.index[-1]}** ({latest_data.iloc[-1]}%).")
+
+    except Exception as e:
+        st.error(f"Error al cargar datos de desempleo: {e}")
 
 
 
