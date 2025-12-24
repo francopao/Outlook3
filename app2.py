@@ -15,6 +15,7 @@ import textwrap
 from dateutil.relativedelta import relativedelta
 import yfinance as yf
 from io import StringIO
+
 # --------------------------------------
 # SCRAPER Y TRANSFORMADOR DE DATOS
 # --------------------------------------
@@ -843,6 +844,106 @@ with st.spinner("Descargando balances de distritos FED..."):
 
     except Exception as e:
         st.error(f"Error en la tabla: {e}")
+
+
+
+    st.markdown("---")
+    st.subheader("Sovereign Credit Ratings (S&P Global)")
+
+    @st.cache_data(ttl=86400) # Cache de 24 horas
+    def get_sovereign_ratings():
+        url = "https://tradingeconomics.com/country-list/rating"
+        response = requests.get(url, headers={"User-Agent":"Mozilla/5.0"})
+        soup = BeautifulSoup(response.text, "lxml")
+        
+        # Buscar la tabla específica
+        tabla = soup.find("table", {"id":"ctl00_ContentPlaceHolder1_ctl01_GridView1"})
+        
+        if tabla:
+            df = pd.read_html(str(tabla))[0]
+            # Limpieza básica
+            df = df.rename(columns={df.columns[0]: "Country"})
+            # Seleccionar solo Country, S&P y la columna de Equivalencia (que suele ser la última)
+            # Nota: Según tu código de Spyder, eliminamos las intermedias
+            df = df.iloc[:, [0, 1, -1]] 
+            df.columns = ["Country", "S&P", "Equivalencia"]
+            
+            # Limpiar valores de Equivalencia para asegurar que sean numéricos
+            df["Equivalencia"] = pd.to_numeric(df["Equivalencia"], errors='coerce')
+            df = df.dropna(subset=["Equivalencia"])
+            return df
+        return None
+
+    with st.spinner("Obteniendo calificaciones crediticias..."):
+        df_rating = get_sovereign_ratings()
+
+    if df_rating is not None:
+        # 1) Filtrado de países específicos solicitados
+        paises_extra = [
+            "Peru", "Colombia", "Chile", "Mexico", "Brazil", 
+            "United States", "France", "China", "Japan", 
+            "Italy", "Germany", "United Kingdom"
+        ]
+        
+        # 2) Seleccionar Top 15 por Equivalencia
+        df_top15 = df_rating.nlargest(15, "Equivalencia")
+        
+        # 3) Seleccionar los países extra si no están en el Top 15
+        df_extras = df_rating[df_rating["Country"].isin(paises_extra)]
+        
+        # 4) Combinar y eliminar duplicados
+        df_plot = pd.concat([df_top15, df_extras]).drop_duplicates(subset=["Country"])
+        
+        # 5) Ordenar para que las mejores calificaciones queden arriba en el gráfico de barras horizontales
+        df_plot = df_plot.sort_values("Equivalencia", ascending=True)
+
+        # 6) Crear el Gráfico
+        fig_rating = go.Figure()
+
+        fig_rating.add_trace(go.Bar(
+            y=df_plot["Country"],
+            x=df_plot["Equivalencia"],
+            orientation='h',
+            text=df_plot["S&P"], # Mostramos el valor AAA, AA, etc. sobre la barra
+            textposition='inside',
+            marker=dict(
+                color=df_plot["Equivalencia"],
+                colorscale='RdYlGn', # De rojo (bajo) a verde (alto)
+                showscale=False
+            ),
+            hovertemplate="<b>%{y}</b><br>Rating: %{text}<br>Score: %{x}<extra></extra>"
+        ))
+
+        # 7) Configuración del Eje X para mostrar S&P en lugar de números
+        # Creamos un mapeo único de los valores presentes para las etiquetas del eje
+        unique_ratings = df_rating.sort_values("Equivalencia")["S&P"].unique()
+        unique_scores = df_rating.sort_values("Equivalencia")["Equivalencia"].unique()
+
+        fig_rating.update_layout(
+            title="S&P Global Sovereign Ratings Hierarchy",
+            xaxis=dict(
+                title="Credit Quality (S&P Scale)",
+                tickmode='array',
+                tickvals=unique_scores,
+                ticktext=unique_ratings,
+                showgrid=True
+            ),
+            yaxis=dict(title=""),
+            height=700,
+            template="plotly_white",
+            margin=dict(l=150) # Espacio para nombres de países largos
+        )
+
+        st.plotly_chart(fig_rating, use_container_width=True)
+        
+        # Opcional: Tabla informativa
+        with st.expander("Ver detalle de Calificaciones"):
+            st.table(df_plot.sort_values("Equivalencia", ascending=False)[["Country", "S&P"]])
+
+    else:
+        st.error("No se pudo conectar con la fuente de datos de TradingEconomics.")
+
+
 
 
 
