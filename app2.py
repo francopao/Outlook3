@@ -608,7 +608,11 @@ with tab4:
     st.markdown("### Risk–Return & Efficient Frontier")
 
     # Selector de periodo
-    current_year = datetime.now().year
+    try:
+        current_date = datetime.datetime.now()
+    except AttributeError:
+        # ai usas "from datetime import datetime"
+        current_date = datetime.now()
     prev_year = current_year - 1
     
     periodo = st.selectbox(
