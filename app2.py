@@ -15,7 +15,6 @@ import textwrap
 from dateutil.relativedelta import relativedelta
 import yfinance as yf
 from io import StringIO
-import datetime
 # --------------------------------------
 # SCRAPER Y TRANSFORMADOR DE DATOS
 # --------------------------------------
@@ -424,6 +423,13 @@ with tab1:
         st.warning("No se encontraron datos para los años seleccionados.")
 
 # Fixed Income 
+import streamlit as st
+import pandas as pd
+import plotly.graph_objects as go
+from fredapi import Fred
+from datetime import datetime  # <--- Homogenizado aquí
+
+# --- Dentro de tu bloque de pestañas ---
 with tab2:
     st.header("Análisis de Tasas y Expectativas de Inflación (FRED)")
     
@@ -479,12 +485,12 @@ with tab2:
                 opacity=0.8, yaxis='y2'
             ))
 
-            # 3) Marcadores de Eventos (Corregido el error de datetime)
-            # Usamos datetime.date o datetime.datetime dependiendo de la importación
+            # 3) Marcadores de Eventos
+            # Ajustado: Usamos datetime() directamente porque importamos la clase
             events = [
-                (datetime.datetime(2022, 3, 16), "Fed hike Mar 2022"),
-                (datetime.datetime(2022, 6, 13), "US CPI peak Jun 2022"),
-                (datetime.datetime(2022, 2, 24), "War in Ukraine Feb 2022")
+                (datetime(2022, 3, 16), "Fed hike Mar 2022"),
+                (datetime(2022, 6, 13), "US CPI peak Jun 2022"),
+                (datetime(2022, 2, 24), "War in Ukraine Feb 2022")
             ]
 
             for ev_date, label in events:
