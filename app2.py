@@ -712,7 +712,146 @@ with st.spinner("Descargando balances de distritos FED..."):
 
     except Exception as e:
         st.error(f"Error al cargar los balances de la FED: {e}")
+
+
+
+    st.markdown("---")
+    st.subheader("Análisis Detallado del Balance de la FED (H.4.1)")
+
+    # 1) Configuración de Series y Estructura
+    api_key = "762e2ee1c8fab5d038ce317929d47226"
+    fred = Fred(api_key=api_key)
+
+    # Definición de la estructura basada en tus imágenes
+    # Formato: {Nombre Visual: Serie FRED}
+    assets_map = {
+        "Total Assets": "WALCL",
+        "Gold certificate account": "WGCAL",
+        "Special drawing rights certificate account": "WOSDRL",
+        "Coin": "WACL",
+        "Bills": "WSHOBL",
+        "Notes and bonds, nominal": "WSHONBNL",
+        "Notes and bonds, inflation-indexed": "WSHONBIIL",
+        "Inflation compensation": "WSHOICL",
+        "Federal agency debt securities": "WSHOFADSL",
+        "Mortgage-backed securities": "WSHOMCB",
+        "Unamortized premiums on securities held outright": "WUPSHO",
+        "Unamortized discounts on securities held outright": "WUDSHO",
+        "Repurchase agreements": "WORAL",
+        "Loans": "WLCFLL",
+        "Net portfolio holdings of MS Facilities LLC": "H41RESPAAENWW",
+        "Items in process of collection": "WPCLC",
+        "Bank premises": "SWPT",
+        "Central bank liquidity swaps": "WABPL",
+        "Foreign currency denominated assets": "WFCDA",
+        "Other Assets": "WAOAL"
+    }
+
+    liabilities_map = {
+        "Total Liabilities": "WLTLECL",
+        "Federal Reserve Notes, net of F.R. Bank holdings": "WLFN",
+        "Reverse repurchase agreements": "WLRRAL",
+        "Deposits": "WLDLC",
+        "Treasury contributions to credit facilities": "H41RESH4ENWW",
+        "Deferred availability cash items": "WLDACLC",
+        "Other Liabilities and Accrued Dividends": "WLAD"
+    }
+
+    @st.cache_data(ttl=3600)
+    def get_fed_table_data():
+        all_series = list(assets_map.values()) + list(liabilities_map.values())
+        df_list = []
         
+        # Descargamos data histórica suficiente
+        for serie in all_series:
+            data = fred.get_series(serie)
+            data.name = serie
+            df_list.append(data)
+        
+        df_master = pd.concat(df_list, axis=1).ffill()
+        return df_master
+
+    try:
+        df_raw = get_fed_table_data()
+        
+        # 2) Definición de Fechas Clave
+        last_date = df_raw.index[-1]
+        prev_week = df_raw.index[-2]
+        year_ago_target = last_date - timedelta(days=365)
+        year_ago_date = df_raw.index[df_raw.index.searchsorted(year_ago_target) - 1]
+        
+        # Fechas fijas solicitadas
+        march_2020_end = datetime(2020, 3, 25) # Última semana Marzo 2020
+        march_2020_prev = datetime(2020, 3, 18)
+        october_2008_start = datetime(2008, 10, 8) # Primera semana Octubre 2008
+        october_2008_prev = datetime(2008, 10, 1)
+
+        # 3) Cálculo de Columnas
+        rows = []
+        
+        def process_group(mapping, group_name):
+            total_serie = mapping[group_name]
+            total_val = df_raw[total_serie].iloc[-1]
+            
+            for label, serie in mapping.items():
+                # Valores nominales
+                current = df_raw[serie].iloc[-1]
+                prev = df_raw[serie].loc[prev_week]
+                
+                # Variaciones
+                var_1w = ((current / prev) - 1) * 100
+                var_year = ((current / df_raw[serie].loc[year_ago_date]) - 1) * 100
+                
+                # Variaciones históricas específicas
+                try:
+                    var_mar20 = ((df_raw[serie].asof(march_2020_end) / df_raw[serie].asof(march_2020_prev)) - 1) * 100
+                    var_oct08 = ((df_raw[serie].asof(october_2008_start) / df_raw[serie].asof(october_2008_prev)) - 1) * 100
+                except:
+                    var_mar20, var_oct08 = 0, 0
+
+                # Contribución a la cuenta (Weight)
+                weight = (current / total_val) * 100
+
+                rows.append({
+                    "Fed Account": label,
+                    "Last Value (Nominal)": current,
+                    "Weight (%)": weight,
+                    "Var% 1 Week": var_1w,
+                    "Year Ago": var_year,
+                    "March 2020": var_mar20,
+                    "October 2008": var_oct08
+                })
+
+        process_group(assets_map, "Total Assets")
+        process_group(liabilities_map, "Total Liabilities")
+        
+        df_final = pd.DataFrame(rows)
+
+        # 4) Visualización Estética
+        def color_variation(val):
+            color = 'red' if val < 0 else 'green'
+            return f'color: {color}'
+
+        st.dataframe(
+            df_final.style.format({
+                "Last Value (Nominal)": "{:,.2f}",
+                "Weight (%)": "{:.2f}%",
+                "Var% 1 Week": "{:+.2f}%",
+                "Year Ago": "{:+.2f}%",
+                "March 2020": "{:+.2f}%",
+                "October 2008": "{:+.2f}%"
+            }).map(color_variation, subset=["Var% 1 Week", "Year Ago", "March 2020", "October 2008"]),
+            height=800,
+            use_container_width=True
+        )
+
+    except Exception as e:
+        st.error(f"Error generando la tabla FED: {e}")
+
+
+
+
+
 
 with tab4:
     st.subheader("📊 Equity & Index Performance")
