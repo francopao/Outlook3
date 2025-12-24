@@ -631,7 +631,80 @@ with tab2:
         except Exception as e:
             st.error(f"Error al procesar datos de crédito: {e}")
 
+# --- Nuevo Bloque: Activos y Pasivos por Distrito FED ---
+st.markdown("---")
+st.subheader("FED Assets & Liabilities by District")
 
+with st.spinner("Descargando balances de distritos FED..."):
+    try:
+        # Definición de distritos y sus respectivas series FRED
+        distritos = [
+            "Boston", "New York", "Philadelphia", "Cleveland", 
+            "Richmond", "Atlanta", "Chicago", "St. Louis", 
+            "Minneapolis", "Kansas City", "Dallas", "San Francisco"
+        ]
+        
+        assets_series = [f"D{i}WATAL" for i in range(1, 13)]
+        liab_series = [f"D{i}WLTOTL" for i in range(1, 13)]
+
+        # Descargar el último dato disponible para cada serie
+        assets_data = []
+        liab_data = []
+
+        for a_id, l_id in zip(assets_series, liab_series):
+            # Obtenemos solo el valor más reciente
+            a_val = fred.get_series(a_id).iloc[-1]
+            l_val = fred.get_series(l_id).iloc[-1]
+            assets_data.append(a_val)
+            liab_data.append(l_val)
+
+        # Crear DataFrame para el gráfico
+        df_fed = pd.DataFrame({
+            'Distrito': distritos,
+            'Assets': assets_data,
+            'Liabilities': liab_data
+        })
+
+        # Construcción del gráfico de barras horizontales
+        fig_fed = go.Figure()
+
+        fig_fed.add_trace(go.Bar(
+            y=df_fed['Distrito'],
+            x=df_fed['Assets'],
+            name='Assets',
+            orientation='h',
+            marker=dict(color='#1E3A8A')
+        ))
+
+        fig_fed.add_trace(go.Bar(
+            y=df_fed['Distrito'],
+            x=df_fed['Liabilities'],
+            name='Liabilities',
+            orientation='h',
+            marker=dict(color='#DC2626')
+        ))
+
+        # Ajustes de Layout
+        fig_fed.update_layout(
+            title="Federal Reserve Banks: Total Assets vs Liabilities by District",
+            xaxis_title="Millions of US Dollars",
+            yaxis=dict(autorange="reversed"), # Para que Boston aparezca arriba
+            barmode='group',
+            template="plotly_white",
+            height=700,
+            hovermode="y unified",
+            legend=dict(orientation="h", y=-0.1, x=0.5, xanchor="center")
+        )
+
+        st.plotly_chart(fig_fed, use_container_width=True)
+
+        # Mostrar tabla resumen expandible
+        with st.expander("Ver tabla de datos (Millones USD)"):
+            st.dataframe(df_fed.style.format("{:,.2f}"))
+
+    except Exception as e:
+        st.error(f"Error al cargar los balances de la FED: {e}")
+        
 
 with tab4:
     st.subheader("📊 Equity & Index Performance")
