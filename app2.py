@@ -930,7 +930,6 @@ with st.spinner("Descargando balances de distritos FED..."):
 
 
 
-
 with tab3:
     st.subheader("Labor Market: Initial vs. Continued Claims")
     
@@ -939,8 +938,8 @@ with tab3:
 
     @st.cache_data(ttl=3600)
     def get_claims_data():
-        # ICSA: Initial Claims (Semanal)
-        # CCSA: Continued Claims (Semanal)
+        # ICSA: Initial Claims
+        # CCSA: Continued Claims
         icsa = fred.get_series('ICSA', observation_start='2019-01-01')
         ccsa = fred.get_series('CCSA', observation_start='2019-01-01')
         
@@ -950,7 +949,6 @@ with tab3:
     try:
         df_claims = get_claims_data()
 
-        # Crear figura con eje secundario
         fig_claims = go.Figure()
 
         # Línea para Continued Claims (Eje Principal - Izquierda)
@@ -959,7 +957,7 @@ with tab3:
             y=df_claims['Continued Claims'],
             name="Continued Claims (CCSA)",
             line=dict(color='#1f77b4', width=2),
-            fill='tozeroy', # Relleno para dar sensación de volumen
+            fill='tozeroy',
             fillcolor='rgba(31, 119, 180, 0.1)'
         ))
 
@@ -972,7 +970,7 @@ with tab3:
             yaxis="y2"
         ))
 
-        # Configuración del Layout
+        # Configuración del Layout CORREGIDA
         fig_claims.update_layout(
             title="US Weekly Jobless Claims: Initial vs Continued",
             hovermode="x unified",
@@ -980,13 +978,17 @@ with tab3:
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
             xaxis=dict(title="Date"),
             yaxis=dict(
-                title="Continued Claims (Millions)",
-                titlefont=dict(color="#1f77b4"),
+                title=dict(
+                    text="Continued Claims (Millions)",
+                    font=dict(color="#1f77b4") # Cambio aquí
+                ),
                 tickfont=dict(color="#1f77b4")
             ),
             yaxis2=dict(
-                title="Initial Claims (Thousands)",
-                titlefont=dict(color="#d62728"),
+                title=dict(
+                    text="Initial Claims (Thousands)",
+                    font=dict(color="#d62728") # Cambio aquí
+                ),
                 tickfont=dict(color="#d62728"),
                 anchor="x",
                 overlaying="y",
@@ -997,7 +999,7 @@ with tab3:
 
         st.plotly_chart(fig_claims, use_container_width=True)
 
-        # Métricas rápidas debajo del gráfico
+        # Métricas
         last_icsa = df_claims['Initial Claims'].iloc[-1]
         last_ccsa = df_claims['Continued Claims'].iloc[-1]
         prev_icsa = df_claims['Initial Claims'].iloc[-2]
@@ -1010,92 +1012,118 @@ with tab3:
         st.error(f"Error al cargar datos de Claims: {e}")
 
 
+
     st.markdown("---")
-    st.subheader("Labor Market: Unemployment Rate by Ethnicity")
+    st.subheader("Labor Market Disparities & Economic Context")
     
     api_key = "762e2ee1c8fab5d038ce317929d47226"
     fred = Fred(api_key=api_key)
 
     @st.cache_data(ttl=3600)
-    def get_unemployment_data():
-        # Mapeo de series solicitadas
+    def get_unemployment_gdp_data():
+        # Mapeo exacto solicitado
         series_map = {
             'LNS14000000': 'Total',
             'LNS14000009': 'Latino',
             'LNS14000003': 'White',
             'LNS14032183': 'Asian',
-            'LNS14000006': 'Black'
+            'LNS14000006': 'Black',
+            'BBKMGDP': 'Monthly GDP'
         }
         
         df_list = []
         for s_id, label in series_map.items():
-            s = fred.get_series(s_id, observation_start='2005-01-01')
-            s.name = label
-            df_list.append(s)
+            try:
+                # Iniciamos en 2003-01-01 para capturar la serie Asian desde su origen
+                s = fred.get_series(s_id, observation_start='2003-01-01')
+                s.name = label
+                df_list.append(s)
+            except:
+                continue
             
         return pd.concat(df_list, axis=1).ffill()
 
     try:
-        df_unemp = get_unemployment_data()
+        df_combined = get_unemployment_gdp_data()
 
-        fig_unemp = go.Figure()
+        fig = go.Figure()
 
-        # Colores específicos para cada grupo
-        colors = {
-            'Total': 'black',
-            'Black': '#d62728', # Rojo (históricamente más alta)
-            'Latino': '#ff7f0e', # Naranja
-            'Asian': '#2ca02c', # Verde (históricamente más baja)
-            'White': '#1f77b4'  # Azul
-        }
-
-        for col in df_unemp.columns:
-            is_total = (col == 'Total')
-            fig_unemp.add_trace(go.Scatter(
-                x=df_unemp.index,
-                y=df_unemp[col],
-                name=col,
-                line=dict(
-                    color=colors.get(col, 'gray'),
-                    width=4 if is_total else 2, # Resaltar la tasa total
-                    dash='dash' if is_total else 'solid'
-                ),
-                hovertemplate=f"<b>{col}</b>: %{{y:.1f}}%<extra></extra>"
+        # 1. Capa de Fondo: Monthly GDP (BBKMGDP)
+        # Se configura como área sombreada muy suave
+        if 'Monthly GDP' in df_combined.columns:
+            fig.add_trace(go.Scatter(
+                x=df_combined.index,
+                y=df_combined['Monthly GDP'],
+                name="Monthly GDP (Ref)",
+                fill='tozeroy',
+                fillcolor='rgba(200, 200, 200, 0.15)', # Gris muy tenue
+                line=dict(color='rgba(150, 150, 150, 0.2)', width=1),
+                yaxis="y2", # Eje secundario
+                hoverinfo='skip' # No distrae en el hover
             ))
 
+        # 2. Series de Desempleo
+        colors = {
+            'Total': 'black',
+            'Black': '#d62728', 
+            'Latino': '#ff7f0e', 
+            'Asian': '#2ca02c', 
+            'White': '#1f77b4'
+        }
+
+        for col in ['Total', 'Black', 'Latino', 'Asian', 'White']:
+            if col in df_combined.columns:
+                is_total = (col == 'Total')
+                fig.add_trace(go.Scatter(
+                    x=df_combined.index,
+                    y=df_combined[col],
+                    name=col,
+                    line=dict(
+                        color=colors.get(col, 'gray'),
+                        width=3.5 if is_total else 1.8,
+                        dash='dash' if is_total else 'solid'
+                    ),
+                    hovertemplate=f"<b>{col}</b>: %{{y:.1f}}%<extra></extra>"
+                ))
+
         # Configuración del Layout
-        fig_unemp.update_layout(
-            title="Unemployment Rate: Racial and Ethnic Disparities",
-            xaxis_title="Year",
-            yaxis_title="Unemployment Rate (%)",
+        fig.update_layout(
+            title="Unemployment Rate by Ethnicity vs Monthly GDP",
+            xaxis=dict(title="Year", showgrid=False),
+            yaxis=dict(
+                title=dict(text="Unemployment Rate (%)"),
+                ticksuffix="%",
+                side="left"
+            ),
+            yaxis2=dict(
+                title=dict(text="GDP Level (Context Only)", font=dict(color="rgba(150,150,150,0.5)")),
+                overlaying="y",
+                side="right",
+                showgrid=False,
+                showticklabels=False # Ocultamos números del GDP para que sea "inadvertido"
+            ),
             hovermode="x unified",
             template="plotly_white",
-            height=600,
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5),
-            yaxis=dict(ticksuffix="%")
+            height=650,
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5)
         )
 
-        # Añadir sombreado para las recesiones (Opcional pero recomendado)
-        # Recesión 2008 y 2020
+        # Sombreado de recesiones
         recessions = [
             ('2007-12-01', '2009-06-01'),
             ('2020-02-01', '2020-04-01')
         ]
         for start, end in recessions:
-            fig_unemp.add_vrect(
+            fig.add_vrect(
                 x0=start, x1=end, 
-                fillcolor="gray", opacity=0.1, 
+                fillcolor="gray", opacity=0.07, 
                 layer="below", line_width=0
             )
 
-        st.plotly_chart(fig_unemp, use_container_width=True)
-
-        # Resumen informativo
-        latest_data = df_unemp.iloc[-1].sort_values(ascending=False)
-        st.info(f"**Current Status:** The highest unemployment rate is among **{latest_data.index[0]}** ({latest_data.iloc[0]}%), while the lowest is among **{latest_data.index[-1]}** ({latest_data.iloc[-1]}%).")
+        st.plotly_chart(fig, use_container_width=True)
 
     except Exception as e:
-        st.error(f"Error al cargar datos de desempleo: {e}")
+        st.error(f"Error al procesar el gráfico: {e}")
 
 
 
