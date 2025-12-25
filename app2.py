@@ -1126,6 +1126,104 @@ with tab3:
         st.error(f"Error al procesar el gráfico: {e}")
 
 
+    st.markdown("---")
+    st.subheader("Employment Variations by Private Industry")
+
+    fred = Fred(api_key=api_key)
+
+    # 1) Definición de series y nombres amigables
+    industry_map = {
+        "MANEMP": "Manufacturing",
+        "USMINE": "Mining",
+        "USTRADE": "Trade",
+        "USPBS": "Professional Services",
+        "CES4300000001": "Transport",
+        "USFIRE": "Finance",
+        "CES6054110001": "Legal Services",
+        "CES5051700001": "Telecoms",
+        "CES6561000001": "Private Education",
+        "NDMANEMP": "Nondurable Goods",
+        "DMANEMP": "Durable Goods",
+        "CES6054000001": "Scientific Services",
+        "CES5553100001": "Real Estate",
+        "USINFO": "Information (Non-Agri)"
+    }
+
+    @st.cache_data(ttl=3600)
+    def get_industry_variations():
+        results = []
+        # Necesitamos al menos 13 meses de datos para calcular el YoY
+        for s_id, name in industry_map.items():
+            try:
+                s = fred.get_series(s_id)
+                if len(s) > 13:
+                    current = s.iloc[-1]
+                    prev_month = s.iloc[-2]
+                    year_ago = s.iloc[-13] # Frecuencia mensual
+
+                    # Cálculos porcentuales
+                    mom = ((current / prev_month) - 1) * 100
+                    yoy = ((current / year_ago) - 1) * 100
+
+                    results.append({
+                        "Industry": name,
+                        "MoM (%)": mom,
+                        "YoY (%)": yoy
+                    })
+            except:
+                continue
+        return pd.DataFrame(results)
+
+    with st.spinner("Calculando variaciones de empleo..."):
+        df_ind = get_industry_variations()
+
+    if not df_ind.empty:
+        # Ordenar por variación anual para mejor visualización
+        df_ind = df_ind.sort_values("YoY (%)", ascending=True)
+
+        # 2) Construcción del gráfico de barras horizontales
+        fig_ind = go.Figure()
+
+        # Barra para Variación Mensual (MoM)
+        fig_ind.add_trace(go.Bar(
+            y=df_ind["Industry"],
+            x=df_ind["MoM (%)"],
+            name="Month-over-Month (MoM)",
+            orientation='h',
+            marker=dict(color='#60A5FA'), # Azul claro
+            hovertemplate="%{y}: %{x:.2f}% MoM<extra></extra>"
+        ))
+
+        # Barra para Variación Anual (YoY)
+        fig_ind.add_trace(go.Bar(
+            y=df_ind["Industry"],
+            x=df_ind["YoY (%)"],
+            name="Year-over-Year (YoY)",
+            orientation='h',
+            marker=dict(color='#1E3A8A'), # Azul oscuro
+            hovertemplate="%{y}: %{x:.2f}% YoY<extra></extra>"
+        ))
+
+        # Configuración del Layout
+        fig_ind.update_layout(
+            title="Employment Growth by Industry: Monthly vs Annual Change",
+            xaxis_title="Percentage Change (%)",
+            yaxis_title="",
+            barmode='group', # Barras una al lado de la otra
+            template="plotly_white",
+            height=700,
+            hovermode="y unified",
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5),
+            margin=dict(l=150) # Margen para nombres de industrias
+        )
+
+        # Añadir línea vertical en 0
+        fig_ind.add_vline(x=0, line_width=1, line_color="black")
+
+        st.plotly_chart(fig_ind, use_container_width=True)
+    else:
+        st.error("No se pudieron obtener datos para las industrias seleccionadas.")
+
 
 
 
