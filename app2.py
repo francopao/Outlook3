@@ -1224,8 +1224,78 @@ with tab3:
     else:
         st.error("No se pudieron obtener datos para las industrias seleccionadas.")
 
+    st.markdown("---")
+    st.subheader("Monthly Employment Change by Industry (%)")
 
+    api_key = "762e2ee1c8fab5d038ce317929d47226"
+    fred = Fred(api_key=api_key)
 
+    # Diccionario de series solicitado
+    industry_series = {
+        "MANEMP": "Manufacturing",
+        "USMINE": "Mining",
+        "USTRADE": "Trade",
+        "USPBS": "Professional Services",
+        "CES4300000001": "Transport",
+        "USFIRE": "Finance",
+        "CES6054110001": "Legal",
+        "CES5051700001": "Telecoms",
+        "CES6561000001": "Private Edu",
+        "NDMANEMP": "Nondurable Goods",
+        "DMANEMP": "Durable Goods",
+        "CES6054000001": "Scientific",
+        "CES5553100001": "Real Estate",
+        "USINFO": "Non-Agri Info"
+    }
+
+    @st.cache_data(ttl=3600)
+    def get_monthly_pct_change():
+        df_list = []
+        # Traemos datos desde 2022 para que el Heatmap sea legible y reciente
+        for s_id, name in industry_series.items():
+            try:
+                s = fred.get_series(s_id, observation_start='2022-01-01')
+                # Calculamos variación porcentual mensual (MoM)
+                pct_change = s.pct_change() * 100
+                pct_change.name = name
+                df_list.append(pct_change)
+            except:
+                continue
+        
+        df = pd.concat(df_list, axis=1).dropna()
+        return df
+
+    try:
+        df_pct = get_monthly_pct_change()
+        
+        # Transponemos para tener industrias en el eje Y y fechas en el eje X
+        df_heatmap = df_pct.T
+
+        # Crear Heatmap con Plotly Express
+        fig_heat = px.imshow(
+            df_heatmap,
+            labels=dict(x="Fecha", y="Industria", color="Var % MoM"),
+            x=df_heatmap.columns,
+            y=df_heatmap.index,
+            color_continuous_scale='RdBu', # Rojo (negativo), Blanco (cero), Azul (positivo)
+            color_continuous_midpoint=0,
+            aspect="auto"
+        )
+
+        fig_heat.update_layout(
+            title="Heatmap: Monthly % Change in Private Employment",
+            xaxis_title="",
+            yaxis_title="",
+            height=600,
+            xaxis=dict(side="top") # Poner las fechas arriba para mejor lectura
+        )
+
+        st.plotly_chart(fig_heat, use_container_width=True)
+
+        st.caption("Los tonos **azules** indican expansión de empleo respecto al mes anterior, mientras que los **rojos** indican contracción.")
+
+    except Exception as e:
+        st.error(f"Error al generar el Heatmap: {e}")
 
 
 with tab4:
