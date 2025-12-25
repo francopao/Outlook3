@@ -1301,101 +1301,117 @@ with tab3:
 
 
 
-    st.markdown("---")
-    st.subheader("Consumer Price Index (CPI) Analysis")
 
+    st.markdown("---")
+    st.subheader("CPI Analysis: Levels & Historical Context")
+
+    api_key = "762e2ee1c8fab5d038ce317929d47226"
     fred = Fred(api_key=api_key)
 
-    # 1) Configuración de Series
-    cpi_series = {
+    # 1) Definición de Series (Valores nominales del índice)
+    cpi_map = {
         "CUUR0000SA0": "Total CPI",
         "CUUR0000SA0L1E": "Core CPI (Less Food/Energy)",
         "CUUR0000SETB01": "Gasoline"
     }
 
     @st.cache_data(ttl=3600)
-    def get_cpi_data():
+    def get_cpi_raw_data():
         df_list = []
-        for s_id, name in cpi_series.items():
+        for s_id, name in cpi_map.items():
             try:
-                # Obtenemos variación porcentual anual (YoY) que es el estándar de CPI
+                # Obtenemos datos desde 2010 para tener una base amplia
                 s = fred.get_series(s_id, observation_start='2010-01-01')
-                # Calculamos el cambio porcentual de 12 meses (YoY)
-                s_yoy = s.pct_change(12) * 100
-                s_yoy.name = name
-                df_list.append(s_yoy)
+                s.name = name
+                df_list.append(s)
             except:
                 continue
-        return pd.concat(df_list, axis=1).dropna()
+        return pd.concat(df_list, axis=1).ffill()
 
     try:
-        df_cpi = get_cpi_data()
+        df_cpi_raw = get_cpi_raw_data()
 
-        # --- GRÁFICO 1: EVOLUCIÓN TEMPORAL (LÍNEAS) ---
-        fig_line = go.Figure()
-        colors = {"Total CPI": "#1E3A8A", "Core CPI (Less Food/Energy)": "#10B981", "Gasoline": "#EF4444"}
+        # --- GRÁFICO 1: EVOLUCIÓN EN EL TIEMPO (3 CURVAS) ---
+        fig_evol = go.Figure()
+        
+        # Colores consistentes
+        colors = {
+            "Total CPI": "#1E3A8A", 
+            "Core CPI (Less Food/Energy)": "#10B981", 
+            "Gasoline": "#EF4444"
+        }
 
-        for col in df_cpi.columns:
-            fig_line.add_trace(go.Scatter(
-                x=df_cpi.index, y=df_cpi[col],
-                name=col, mode='lines',
-                line=dict(width=2.5, color=colors.get(col)),
-                hovertemplate=f"<b>{col}</b>: %{{y:.1f}}%<extra></extra>"
+        for col in df_cpi_raw.columns:
+            fig_evol.add_trace(go.Scatter(
+                x=df_cpi_raw.index,
+                y=df_cpi_raw[col],
+                name=col,
+                mode='lines',
+                line=dict(width=2.5, color=colors.get(col, "gray")),
+                hovertemplate=f"<b>{col}</b>: %{{y:.2f}}<extra></extra>"
             ))
 
-        fig_line.update_layout(
-            title="CPI Inflation Evolution (Year-over-Year %)",
-            xaxis_title="Year", yaxis_title="YoY Change (%)",
-            template="plotly_white", hovermode="x unified",
-            height=450, legend=dict(orientation="h", y=-0.2)
+        fig_evol.update_layout(
+            title="CPI Index Levels: Evolution over Time",
+            xaxis_title="Year",
+            yaxis_title="Index Level",
+            template="plotly_white",
+            hovermode="x unified",
+            height=450,
+            legend=dict(orientation="h", yanchor="bottom", y=-0.3, xanchor="center", x=0.5)
         )
-        st.plotly_chart(fig_line, use_container_width=True)
+        st.plotly_chart(fig_evol, use_container_width=True)
 
 
-        # --- GRÁFICO 2: NIVEL ACTUAL VS PROMEDIO (BARRAS + PUNTO) ---
-        # Preparar datos: último valor y promedio histórico
-        latest_vals = df_cpi.iloc[-1]
-        hist_avg = df_cpi.mean()
-        
-        fig_bar = go.Figure()
+        # --- GRÁFICO 2: ACTUAL VS PROMEDIO 10 AÑOS (BARRAS Y PUNTOS) ---
+        # Calculamos el promedio de los últimos 10 años (120 meses)
+        avg_10y = df_cpi_raw.iloc[-120:].mean()
+        latest_vals = df_cpi_raw.iloc[-1]
 
-        # Barras Azules (Nivel Actual)
-        fig_bar.add_trace(go.Bar(
+        fig_context = go.Figure()
+
+        # Barras verticales (Nivel actual) - Azul oscuro
+        fig_context.add_trace(go.Bar(
             x=latest_vals.index,
             y=latest_vals.values,
-            name="Current Yield (Latest)",
+            name="Current Level",
             marker_color="#1E3A8A",
-            text=[f"{v:.1f}%" for v in latest_vals.values],
-            textposition='outside',
-            width=0.4
+            width=0.4,
+            text=[f"{v:.1f}" for v in latest_vals.values],
+            textposition='outside'
         ))
 
-        # Puntos Celestes (Promedio Histórico)
-        fig_bar.add_trace(go.Scatter(
-            x=hist_avg.index,
-            y=hist_avg.values,
-            name="Historical Average",
+        # Puntos redondeados (Promedio histórico 10Y) - Celeste/Azul claro
+        fig_context.add_trace(go.Scatter(
+            x=avg_10y.index,
+            y=avg_10y.values,
+            name="10Y Average",
             mode='markers+text',
-            marker=dict(color="#93C5FD", size=15, line=dict(width=2, color="white")),
-            text=[f"{v:.1f}%" for v in hist_avg.values],
+            marker=dict(
+                color="#93C5FD", 
+                size=18, 
+                line=dict(width=2, color="white")
+            ),
+            text=[f"{v:.1f}" for v in avg_10y.values],
             textposition="top center",
-            hovertemplate="Avg: %{y:.2f}%<extra></extra>"
+            textfont=dict(color="#1E3A8A", size=12),
+            hovertemplate="10Y Avg: %{y:.2f}<extra></extra>"
         ))
 
-        fig_bar.update_layout(
-            title="Seeking Context: Current Inflation vs Historical Average",
-            yaxis_title="Yield (%)",
+        fig_context.update_layout(
+            title="Current Index vs 10-Year Historical Average",
+            yaxis_title="Index Value",
             template="plotly_white",
+            height=550,
             showlegend=True,
-            height=500,
-            xaxis=dict(tickangle=0),
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+            xaxis=dict(tickangle=0)
         )
 
-        st.plotly_chart(fig_bar, use_container_width=True)
+        st.plotly_chart(fig_context, use_container_width=True)
 
     except Exception as e:
-        st.error(f"Error procesando datos de CPI: {e}")
+        st.error(f"Error al generar los gráficos de CPI: {e}")
 
 
 
