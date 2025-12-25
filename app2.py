@@ -1300,8 +1300,6 @@ with tab3:
 
 
 
-
-
     st.markdown("---")
     st.subheader("CPI Analysis: Index Levels & Historical Context")
 
