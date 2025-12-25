@@ -1298,6 +1298,116 @@ with tab3:
         st.error(f"Error al generar el Heatmap: {e}")
 
 
+
+
+
+    st.markdown("---")
+    st.subheader("Consumer Price Index (CPI) Analysis")
+
+    fred = Fred(api_key=api_key)
+
+    # 1) Configuración de Series
+    cpi_series = {
+        "CUUR0000SA0": "Total CPI",
+        "CUUR0000SA0L1E": "Core CPI (Less Food/Energy)",
+        "CUUR0000SETB01": "Gasoline"
+    }
+
+    @st.cache_data(ttl=3600)
+    def get_cpi_data():
+        df_list = []
+        for s_id, name in cpi_series.items():
+            try:
+                # Obtenemos variación porcentual anual (YoY) que es el estándar de CPI
+                s = fred.get_series(s_id, observation_start='2010-01-01')
+                # Calculamos el cambio porcentual de 12 meses (YoY)
+                s_yoy = s.pct_change(12) * 100
+                s_yoy.name = name
+                df_list.append(s_yoy)
+            except:
+                continue
+        return pd.concat(df_list, axis=1).dropna()
+
+    try:
+        df_cpi = get_cpi_data()
+
+        # --- GRÁFICO 1: EVOLUCIÓN TEMPORAL (LÍNEAS) ---
+        fig_line = go.Figure()
+        colors = {"Total CPI": "#1E3A8A", "Core CPI (Less Food/Energy)": "#10B981", "Gasoline": "#EF4444"}
+
+        for col in df_cpi.columns:
+            fig_line.add_trace(go.Scatter(
+                x=df_cpi.index, y=df_cpi[col],
+                name=col, mode='lines',
+                line=dict(width=2.5, color=colors.get(col)),
+                hovertemplate=f"<b>{col}</b>: %{{y:.1f}}%<extra></extra>"
+            ))
+
+        fig_line.update_layout(
+            title="CPI Inflation Evolution (Year-over-Year %)",
+            xaxis_title="Year", yaxis_title="YoY Change (%)",
+            template="plotly_white", hovermode="x unified",
+            height=450, legend=dict(orientation="h", y=-0.2)
+        )
+        st.plotly_chart(fig_line, use_container_width=True)
+
+
+        # --- GRÁFICO 2: NIVEL ACTUAL VS PROMEDIO (BARRAS + PUNTO) ---
+        # Preparar datos: último valor y promedio histórico
+        latest_vals = df_cpi.iloc[-1]
+        hist_avg = df_cpi.mean()
+        
+        fig_bar = go.Figure()
+
+        # Barras Azules (Nivel Actual)
+        fig_bar.add_trace(go.Bar(
+            x=latest_vals.index,
+            y=latest_vals.values,
+            name="Current Yield (Latest)",
+            marker_color="#1E3A8A",
+            text=[f"{v:.1f}%" for v in latest_vals.values],
+            textposition='outside',
+            width=0.4
+        ))
+
+        # Puntos Celestes (Promedio Histórico)
+        fig_bar.add_trace(go.Scatter(
+            x=hist_avg.index,
+            y=hist_avg.values,
+            name="Historical Average",
+            mode='markers+text',
+            marker=dict(color="#93C5FD", size=15, line=dict(width=2, color="white")),
+            text=[f"{v:.1f}%" for v in hist_avg.values],
+            textposition="top center",
+            hovertemplate="Avg: %{y:.2f}%<extra></extra>"
+        ))
+
+        fig_bar.update_layout(
+            title="Seeking Context: Current Inflation vs Historical Average",
+            yaxis_title="Yield (%)",
+            template="plotly_white",
+            showlegend=True,
+            height=500,
+            xaxis=dict(tickangle=0),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+        )
+
+        st.plotly_chart(fig_bar, use_container_width=True)
+
+    except Exception as e:
+        st.error(f"Error procesando datos de CPI: {e}")
+
+
+
+
+
+
+
+
+
+
+
+
 with tab4:
     st.subheader("📊 Equity & Index Performance")
 
