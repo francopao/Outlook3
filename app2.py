@@ -1303,12 +1303,12 @@ with tab3:
 
 
     st.markdown("---")
-    st.subheader("CPI Analysis: Levels & Historical Context")
+    st.subheader("CPI Analysis: Index Levels & Historical Context")
 
     api_key = "762e2ee1c8fab5d038ce317929d47226"
     fred = Fred(api_key=api_key)
 
-    # 1) Definición de Series (Valores nominales del índice)
+    # 1) Definición de Series (Niveles del Índice)
     cpi_map = {
         "CUUR0000SA0": "Total CPI",
         "CUUR0000SA0L1E": "Core CPI (Less Food/Energy)",
@@ -1320,7 +1320,7 @@ with tab3:
         df_list = []
         for s_id, name in cpi_map.items():
             try:
-                # Obtenemos datos desde 2010 para tener una base amplia
+                # Obtenemos los niveles nominales desde 2010
                 s = fred.get_series(s_id, observation_start='2010-01-01')
                 s.name = name
                 df_list.append(s)
@@ -1331,10 +1331,8 @@ with tab3:
     try:
         df_cpi_raw = get_cpi_raw_data()
 
-        # --- GRÁFICO 1: EVOLUCIÓN EN EL TIEMPO (3 CURVAS) ---
+        # --- GRÁFICO 1: EVOLUCIÓN TEMPORAL (3 LÍNEAS) ---
         fig_evol = go.Figure()
-        
-        # Colores consistentes
         colors = {
             "Total CPI": "#1E3A8A", 
             "Core CPI (Less Food/Energy)": "#10B981", 
@@ -1347,12 +1345,12 @@ with tab3:
                 y=df_cpi_raw[col],
                 name=col,
                 mode='lines',
-                line=dict(width=2.5, color=colors.get(col, "gray")),
+                line=dict(width=2.5, color=colors.get(col)),
                 hovertemplate=f"<b>{col}</b>: %{{y:.2f}}<extra></extra>"
             ))
 
         fig_evol.update_layout(
-            title="CPI Index Levels: Evolution over Time",
+            title="CPI Index Levels: Evolution (Nominal Values)",
             xaxis_title="Year",
             yaxis_title="Index Level",
             template="plotly_white",
@@ -1363,49 +1361,52 @@ with tab3:
         st.plotly_chart(fig_evol, use_container_width=True)
 
 
-        # --- GRÁFICO 2: ACTUAL VS PROMEDIO 10 AÑOS (BARRAS Y PUNTOS) ---
-        # Calculamos el promedio de los últimos 10 años (120 meses)
-        avg_10y = df_cpi_raw.iloc[-120:].mean()
+        # --- GRÁFICO 2: NIVEL ACTUAL VS PROMEDIO 10 AÑOS (BARRAS + PUNTOS) ---
+        # Último valor nominal disponible
         latest_vals = df_cpi_raw.iloc[-1]
+        # Promedio nominal de los últimos 10 años (120 meses)
+        avg_10y = df_cpi_raw.iloc[-120:].mean()
 
         fig_context = go.Figure()
 
-        # Barras verticales (Nivel actual) - Azul oscuro
+        # BARRAS: Nivel Actual (Valor nominal)
         fig_context.add_trace(go.Bar(
             x=latest_vals.index,
             y=latest_vals.values,
-            name="Current Level",
+            name="Current Level (Latest)",
             marker_color="#1E3A8A",
-            width=0.4,
-            text=[f"{v:.1f}" for v in latest_vals.values],
-            textposition='outside'
+            width=0.5,
+            text=[f"{v:.2f}" for v in latest_vals.values],
+            textposition='outside',
+            textfont=dict(size=12, color="black")
         ))
 
-        # Puntos redondeados (Promedio histórico 10Y) - Celeste/Azul claro
+        # PUNTOS: Promedio 10 Años (Valor nominal)
         fig_context.add_trace(go.Scatter(
             x=avg_10y.index,
             y=avg_10y.values,
-            name="10Y Average",
+            name="10Y Historical Average",
             mode='markers+text',
             marker=dict(
                 color="#93C5FD", 
-                size=18, 
+                size=22, 
                 line=dict(width=2, color="white")
             ),
-            text=[f"{v:.1f}" for v in avg_10y.values],
+            text=[f"{v:.2f}" for v in avg_10y.values],
             textposition="top center",
-            textfont=dict(color="#1E3A8A", size=12),
-            hovertemplate="10Y Avg: %{y:.2f}<extra></extra>"
+            textfont=dict(color="#1E3A8A", size=13, weight='bold'),
+            hovertemplate="10Y Average: %{y:.2f}<extra></extra>"
         ))
 
         fig_context.update_layout(
-            title="Current Index vs 10-Year Historical Average",
-            yaxis_title="Index Value",
+            title="Seeking Context: Current Index Level vs 10Y Average",
+            yaxis_title="Nominal Index Value",
             template="plotly_white",
-            height=550,
+            height=600,
             showlegend=True,
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-            xaxis=dict(tickangle=0)
+            legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="right", x=1),
+            xaxis=dict(tickangle=0),
+            yaxis=dict(range=[0, latest_vals.max() * 1.2]) # Ajuste de escala para que se vean las etiquetas
         )
 
         st.plotly_chart(fig_context, use_container_width=True)
