@@ -1402,7 +1402,116 @@ with tab3:
         st.error(f"Error en la visualización: {e}")
 
 
+    
+    st.markdown("---")
+    st.subheader("Import Price Indices: Sectoral Evolution")
 
+    api_key = "762e2ee1c8fab5d038ce317929d47226"
+    fred = Fred(api_key=api_key)
+
+    # Diccionario de series solicitado
+    import_map = {
+        "EIUIREXPET": "Total (Ex-Petroleum)",
+        "EIUIR": "All Commodities",
+        "EIUIR0": "Foods & Beverages",
+        "EIUIR1": "Industrial Materials",
+        "EIUIR4": "Consumer Goods",
+        "EIUIR3": "Automotive Vehicles",
+        "EIUIR2": "Capital Goods" # Corregido ID: EIUIR2 suele ser Capital Goods
+    }
+
+    @st.cache_data(ttl=3600)
+    def get_import_data():
+        df_list = []
+        for s_id, name in import_map.items():
+            try:
+                s = fred.get_series(s_id, observation_start='2015-01-01')
+                s.name = name
+                df_list.append(s)
+            except:
+                continue
+        return pd.concat(df_list, axis=1).ffill()
+
+    try:
+        df_imp = get_import_data()
+
+        # 1. Gráfico de Evolución Temporal Principal
+        fig_imp = go.Figure()
+
+        for col in df_imp.columns:
+            # Resaltamos el Total
+            is_total = (col == "Total (Ex-Petroleum)")
+            fig_imp.add_trace(go.Scatter(
+                x=df_imp.index,
+                y=df_imp[col],
+                name=col,
+                line=dict(width=4 if is_total else 1.5, 
+                          dash='dash' if is_total else 'solid'),
+                hovertemplate=f"<b>{col}</b>: %{{y:.1f}}<extra></extra>"
+            ))
+
+        fig_imp.update_layout(
+            title="Import Price Indices by Sector (Index 2000=100)",
+            xaxis=dict(
+                title="",
+                rangeselector=dict(
+                    buttons=list([
+                        dict(count=1, label="1y", step="year", stepmode="backward"),
+                        dict(count=5, label="5y", step="year", stepmode="backward"),
+                        dict(step="all")
+                    ])
+                ),
+                rangeslider=dict(visible=True),
+                type="date"
+            ),
+            yaxis_title="Index Level",
+            template="plotly_white",
+            height=600,
+            hovermode="x unified",
+            legend=dict(orientation="h", y=-0.5)
+        )
+
+        st.plotly_chart(fig_imp, use_container_width=True)
+
+        # 2. Análisis Ingenioso: Slope Chart (Cambio en los últimos 2 años)
+        st.write("#### 2-Year Relative Momentum")
+        
+        # Tomamos el dato de hoy y el de hace 24 meses
+        latest = df_imp.iloc[-1]
+        start_point = df_imp.iloc[-24]
+        
+        # Normalizamos a base 100 para comparar el crecimiento relativo en ese periodo
+        growth = ((latest / start_point) - 1) * 100
+        df_slope = growth.sort_values(ascending=False).reset_index()
+        df_slope.columns = ['Sector', 'Change']
+
+        fig_slope = go.Figure()
+
+        fig_slope.add_trace(go.Bar(
+            x=df_slope['Change'],
+            y=df_slope['Sector'],
+            orientation='h',
+            marker=dict(
+                color=df_slope['Change'],
+                colorscale='Viridis',
+                reversescale=True
+            ),
+            text=[f"{x:+.1f}%" for x in df_slope['Change']],
+            textposition='outside'
+        ))
+
+        fig_slope.update_layout(
+            title="Relative Price Change (Last 24 Months)",
+            xaxis_title="Percentage Change (%)",
+            template="plotly_white",
+            height=500,
+            margin=dict(l=200)
+        )
+
+        st.plotly_chart(fig_slope, use_container_width=True)
+
+    except Exception as e:
+        st.error(f"Error al procesar índices de importación: {e}")
 
 
 
