@@ -1309,8 +1309,8 @@ with tab3:
 
     # Diccionario exacto con las 3 series solicitadas
     cpi_dict = {
-        "CUUR0000SA0": "Total CPI",
-        "CUUR0000SA0L1E": "Core CPI (Less Food & Energy)",
+        "CPIAUCSL": "Total CPI",
+        "CPILFESL": "Core CPI",
         "CUUR0000SETB01": "Gasoline"
     }
 
@@ -1320,7 +1320,7 @@ with tab3:
         for s_id, name in cpi_dict.items():
             try:
                 # Traemos datos desde 2014 para asegurar los 10 años de promedio
-                s = fred.get_series(s_id, observation_start='2014-01-01')
+                s = fred.get_series(s_id, observation_start='2014-01-01').dropna()
                 s.name = name
                 df_list.append(s)
             except Exception as e:
