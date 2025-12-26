@@ -431,11 +431,6 @@ with tab1:
         st.warning("No se encontraron datos para los años seleccionados.")
 
 # Fixed Income 
-import streamlit as st
-import pandas as pd
-import plotly.graph_objects as go
-from fredapi import Fred
-from datetime import datetime  # <--- Homogenizado aquí
 
 # --- Dentro de tu bloque de pestañas ---
 with tab2:
@@ -639,10 +634,10 @@ with tab2:
         except Exception as e:
             st.error(f"Error al procesar datos de crédito: {e}")
 
+
 # --- Nuevo Bloque: Activos y Pasivos por Distrito FED ---
-# --- Nuevo Bloque: Activos y Pasivos por Distrito FED ---
-st.markdown("---")
-st.subheader("FED Assets & Liabilities by District")
+    st.markdown("---")
+    st.subheader("FED Assets & Liabilities by District")
 
 with st.spinner("Descargando balances de distritos FED..."):
     try:
