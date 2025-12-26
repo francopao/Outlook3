@@ -1311,7 +1311,7 @@ with tab3:
     cpi_dict = {
         "CPIAUCSL": "Total CPI",
         "CPILFESL": "Core CPI",
-        "CUUR0000SETB01": "Gasoline"
+        "CUSR0000SETB01": "Gasoline"
     }
 
     @st.cache_data(ttl=3600)
