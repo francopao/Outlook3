@@ -706,14 +706,14 @@ with tab2:
             st.plotly_chart(fig_fed, use_container_width=True)
 
         # Mostrar tabla resumen con el formato corregido
-        with st.expander("Ver tabla de datos (Millones USD)"):
-            # Aplicamos el formato solo a las columnas numéricas
-            st.dataframe(df_fed.style.format({
-                'Assets': '{:,.2f}',
-                'Liabilities': '{:,.2f}'
-            }))
+            with st.expander("Ver tabla de datos (Millones USD)"):
+                # Aplicamos el formato solo a las columnas numéricas
+                st.dataframe(df_fed.style.format({
+                    'Assets': '{:,.2f}',
+                    'Liabilities': '{:,.2f}'
+                }))
 
-    except Exception as e:
+        except Exception as e:
             st.error(f"Error al cargar los balances de la FED: {e}")
 
 
